@@ -1,0 +1,20 @@
+<!-- include these scripts in web page: code: -->
+<script src="socket.io/socket.io.js"></script>
+<script src="http://code.jquery.com/jquery-1.10.2.min.js"></script>
+
+<!-- We'll make a container who's gonna receive updates: -->
+<div id="container">TEST Push Notification</div>
+
+<!-- Then we'll make a script on client: -->
+<script>
+  // Create a client socket:
+  var socket = io.connect('http://localhost');
+
+  // Apply a listener on socket: 
+  // on seeing 'notification' on socket : catch what is written in 'data' var. and proceed: 
+  // while sending data from node server we'll specify that: "It's a 'notification' written on socket"
+  socket.on('notification', function (data) {
+    console.log(data)
+    $('#container').append("<br/>"+data.message);
+  });
+</script>
