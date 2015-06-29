@@ -1,54 +1,99 @@
 package client
 
 import (
-	"bytes"
 	"encoding/json"
-	"fmt"
 	"log"
+	"strings"
 
 	"github.com/boltdb/bolt"
-	"github.com/jh-bate/d-data-cli/models"
-
-	"github.com/jh-bate/d-data-cli/models/smbg"
+	"github.com/jh-bate/fantail/models"
+	"github.com/jh-bate/fantail/user"
 )
 
 type Store struct{}
 
 const (
-	events_db    = "%s_eventdata.db"
-	users_backet = "users"
+	events_db    = "fantail_data.db"
+	users_bucket = "users"
 )
 
 //store created on a per user basis
 func NewStore() *Store { return &Store{} }
 
-func (s *Store) open(userid string) *bolt.DB {
-	db, err := bolt.Open(fmt.Sprintf(events_db, userid), 0600, nil)
+func (s *Store) open() *bolt.DB {
+	db, err := bolt.Open(events_db, 0600, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
 	db.Update(func(tx *bolt.Tx) error {
+		//create buckets for all types we use
 		tx.CreateBucketIfNotExists([]byte(models.EventTypes.Smbg.String()))
+		tx.CreateBucketIfNotExists([]byte(users_bucket))
 		return nil
 	})
 	return db
 }
-func (s *Store) AddSmbgs(userid string, data smbg.Smbgs) error {
 
-	current, _ := s.GetSmbgs(userid)
+func (s *Store) AddUser(usr *user.User) error {
+	db := s.open()
+	defer db.Close()
+	log.Println("Adding ...", usr.Id)
+	//existingUsr, _ := GetUserByEmail(usr.Email)
+	//if existingUsr == nil {
+	log.Println("No existing user so adding ...", usr.Id)
+	return db.Update(func(tx *bolt.Tx) error {
+		eb := tx.Bucket([]byte(users_bucket))
 
-	if len(current) > 0 {
-		log.Println("we aleady have data for [", userid, "] so updating")
-		data = append(data, current...)
-	}
+		return eb.Put([]byte(usr.Id), usr.Json())
+	})
+	//}
 
-	db := s.open(userid)
+	//return errors.New("user already exists")
+}
+
+func (s *Store) GetUserByEmail(email string) (*user.User, error) {
+	db := s.open()
 	defer db.Close()
 
-	return db.Update(func(tx *bolt.Tx) error {
-		eb := tx.Bucket([]byte(models.EventTypes.Smbg.String()))
-		return eb.Put([]byte(userid), data.Json())
+	var usr *user.User
+	log.Println("Looking for ...", email)
+	err := db.View(func(tx *bolt.Tx) error {
+		ub := tx.Bucket([]byte(users_bucket))
+		c := ub.Cursor()
+		// try and match
+		for k, v := c.First(); k != nil; k, v = c.Next() {
+
+			json.Unmarshal(v, &usr)
+			log.Println("Checking ...", usr.Email)
+			if strings.ToLower(usr.Email) == strings.ToLower(email) {
+				return nil
+			}
+		}
+		//no match found
+		usr = nil
+		return nil
 	})
+	log.Printf("found user %#v ", usr)
+	return usr, err
+}
+
+func (s *Store) GetUser(id string) (*user.User, error) {
+	db := s.open()
+	defer db.Close()
+
+	var usr *user.User
+
+	err := db.View(func(tx *bolt.Tx) error {
+		eb := tx.Bucket([]byte(users_bucket))
+		data := eb.Get([]byte(id))
+		if len(data) > 0 {
+			return json.Unmarshal(data, &usr)
+		}
+		log.Println("boo no user!")
+		return nil
+	})
+	log.Printf("found user %#v ", usr)
+	return usr, err
 }
 
 func (s *Store) AddSmbgs2(userid string, data []byte) error {
@@ -60,7 +105,7 @@ func (s *Store) AddSmbgs2(userid string, data []byte) error {
 		data = append(data, current...)
 	}
 
-	db := s.open(userid)
+	db := s.open()
 	defer db.Close()
 
 	return db.Update(func(tx *bolt.Tx) error {
@@ -70,7 +115,7 @@ func (s *Store) AddSmbgs2(userid string, data []byte) error {
 }
 
 func (s *Store) GetSmbgs2(userid string) ([]byte, error) {
-	db := s.open(userid)
+	db := s.open()
 	defer db.Close()
 
 	var smbgs []byte
@@ -89,6 +134,26 @@ func (s *Store) GetSmbgs2(userid string) ([]byte, error) {
 	})
 	//log.Println("return form db ", string(smbgs[:]))
 	return smbgs, err
+}
+
+/*
+
+func (s *Store) AddSmbgs(userid string, data smbg.Smbgs) error {
+
+	current, _ := s.GetSmbgs(userid)
+
+	if len(current) > 0 {
+		log.Println("we aleady have data for [", userid, "] so updating")
+		data = append(data, current...)
+	}
+
+	db := s.open(userid)
+	defer db.Close()
+
+	return db.Update(func(tx *bolt.Tx) error {
+		eb := tx.Bucket([]byte(models.EventTypes.Smbg.String()))
+		return eb.Put([]byte(userid), data.Json())
+	})
 }
 
 func (s *Store) GetSmbgs(userid string) (smbg.Smbgs, error) {
@@ -136,3 +201,4 @@ func (s *Store) Get(path string, data interface{}) error {
 		return nil
 	})
 }
+*/

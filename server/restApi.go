@@ -9,19 +9,19 @@ import (
 
 	"github.com/ant0ine/go-json-rest/rest"
 
-	"github.com/jh-bate/d-data-cli/client"
-	"github.com/jh-bate/d-data-cli/user"
+	"github.com/jh-bate/fantail/client"
 )
 
 var dataApi *client.Api
-var userStore *user.Store
+
+//var userStore *user.Store
 
 const session_token = "x-dhub-token"
 
 func main() {
 
 	dataApi = client.InitApi(client.NewStore())
-	userStore = &user.Store{Users: map[string]*user.User{}}
+	//userStore = &user.Store{Users: map[string]*user.User{}}
 
 	api := rest.NewApi()
 
@@ -79,20 +79,22 @@ func notImplemented(w rest.ResponseWriter, r *rest.Request) {
 }
 
 func checkAuth(w rest.ResponseWriter, r *rest.Request, handler rest.HandlerFunc) {
-	//if user.SessionValid(r.Header.Get(session_token), userStore) {
+
+	usr, _ := dataApi.AuthenticateUserSession(r.Header.Get(session_token))
+	log.Printf("authenticated user? %#v", usr)
+	/*
+		if err != nil {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}*/
 	handler(w, r)
-	//	return
-	//}
-	//w.WriteHeader(http.StatusUnauthorized)
 }
 
 func refresh(w rest.ResponseWriter, r *rest.Request) {
-
-	if updated := user.SessionRefresh(r.Header.Get(session_token), userStore); updated != "" {
-		w.Header().Set(session_token, updated)
+	if newToken := dataApi.RefreshUserSession(r.Header.Get(session_token)); newToken != "" {
+		w.Header().Set(session_token, newToken)
 		return
 	}
-
 	w.WriteHeader(http.StatusUnauthorized)
 	return
 }
@@ -115,15 +117,17 @@ func login(w rest.ResponseWriter, r *rest.Request) {
 		return
 	}
 
-	if usr := userStore.GetUser(pair[0]); usr != nil {
-		if usr.Validate(pair[1]) {
-			log.Println("logging in ...")
-			token := usr.Login(userStore)
-			log.Println("logged in ", token)
-			w.Header().Set(session_token, token)
-			return
-		}
-		w.WriteHeader(http.StatusForbidden)
+	usr, err := dataApi.GetUserByEmail(pair[0])
+
+	if err != nil {
+		log.Println("login err:", err.Error())
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+
+	if usr != nil && usr.Validate(pair[1]) {
+		sessionToken := usr.Login()
+		log.Println("logged in ", sessionToken)
+		w.Header().Set(session_token, sessionToken)
 		return
 	}
 
@@ -134,23 +138,14 @@ func login(w rest.ResponseWriter, r *rest.Request) {
 //curl -d '{"email": "jamie@tidepool.org","name":"Jamie Bate", "password": "admin"}' -H "Content-Type:application/json" http://localhost:8090/signup
 func signup(w rest.ResponseWriter, r *rest.Request) {
 
-	raw := user.DecodeRaw(r.Body)
-
-	if raw.Email == "" || raw.Name == "" || raw.Pass == "" {
+	savedUsr, err := dataApi.SaveUser(r.Body)
+	if err != nil {
+		log.Println("signup err: ", err.Error())
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-
-	newUsr := user.NewUser(raw.Name, raw.Email, raw.Pass)
-
-	if newUsr.Signup(userStore) {
-		w.WriteHeader(http.StatusCreated)
-		w.WriteJson(newUsr)
-		return
-	}
-
-	w.WriteHeader(http.StatusConflict)
-	w.WriteJson(newUsr)
+	w.WriteHeader(http.StatusCreated)
+	w.WriteJson(savedUsr)
 	return
 }
 
