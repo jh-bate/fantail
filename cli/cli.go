@@ -8,8 +8,8 @@ import (
 
 	"github.com/codegangsta/cli"
 
-	"github.com/jh-bate/d-data-cli/client"
-	"github.com/jh-bate/d-data-cli/models"
+	"github.com/jh-bate/fantail/client"
+	"github.com/jh-bate/fantail/models"
 )
 
 var (
