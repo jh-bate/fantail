@@ -2,11 +2,10 @@ package client
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"io"
 	"log"
-	"net/http"
+	"os"
 
 	"github.com/jh-bate/fantail/models/smbg"
 
@@ -14,161 +13,122 @@ import (
 )
 
 type Api struct {
-	store *Store
+	store  *Store
+	logger *log.Logger
 }
 
-type detailedError struct {
-	Id     string `json:"id"`
-	Status int    `json:"status"`
-	Title  string `json:"title"`
-	Detail string `json:"detail"`
+func InitApi(s *Store) *Api {
+	return &Api{store: s, logger: log.New(os.Stdout, "fantail/api:", log.Lshortfile)}
 }
 
-// to give a better sense of what and where something went wrong
-func DetailedError(id string, status int, title, detail string) error {
-	detailed := detailedError{Id: id, Status: status, Title: title, Detail: detail}
-	b, _ := json.Marshal(detailed)
-	return errors.New(string(b))
-}
+func (a *Api) SaveUser(in io.Reader) (*user.User, error) {
 
-var (
-	ErrBadRequest     = DetailedError("bad_request", http.StatusBadRequest, "Bad request", "Request body is not well-formed. It must be JSON.")
-	ErrUserSignup     = DetailedError("invalid_user_data", http.StatusBadRequest, "Bad request", "Please check that data you used to signup")
-	ErrNoUserid       = DetailedError("no_userid", http.StatusBadRequest, "No userid", "The userid must be set.")
-	ErrInternalServer = DetailedError("internal_server_error", http.StatusInternalServerError, "Internal Server Error", "Something went wrong.")
-)
+	raw := user.DecodeRaw(in)
 
-func InitApi(s *Store) *Api { return &Api{store: s} }
-
-func (a *Api) SaveUser(src io.Reader) (*user.User, error) {
-
-	raw := user.DecodeRaw(src)
-
-	log.Printf("lets check %#v", raw)
+	a.logger.Printf("lets check %#v", raw)
 	if raw.Valid() {
+		savedUser := raw.NewUser()
+		a.logger.Printf("dup check save! %#v", savedUser.Email)
+		exists, _ := a.store.GetUserByEmail(savedUser.Email)
+		if exists != nil {
 
-		usr := raw.NewUser()
-		log.Printf("lets save! %#v", usr)
-		err := a.store.AddUser(usr)
-		return usr, err
+		}
+		a.logger.Printf("lets save! %#v", savedUser)
+		err := a.store.AddUser(savedUser)
+		if err != nil {
+			a.logger.Println(err.Error())
+			return savedUser, ErrInternalServer.Error
+		}
+		return savedUser, err
 	}
-	return nil, ErrUserSignup
+	a.logger.Println(ErrInvalidSignup.Error)
+	return nil, ErrInvalidSignup.Error
 }
 
 func (a *Api) GetUser(id string) (*user.User, error) {
 	if id == "" {
-		return nil, ErrNoUserid
+		a.logger.Println(ErrNoUserId.Error)
+		return nil, ErrNoUserId.Error
 	}
-	return a.store.GetUser(id)
+	foundUser, err := a.store.GetUser(id)
+	if err != nil {
+		a.logger.Println(err.Error())
+		return nil, ErrInternalServer.Error
+	}
+	return foundUser, nil
 }
 
 func (a *Api) AuthenticateUserSession(sessionToken string) (*user.User, error) {
+
+	a.logger.Println("token ", sessionToken)
 	valid, data := user.SessionValid(sessionToken)
-	if valid {
-		user, err := a.GetUser(data.UserId)
+	a.logger.Printf("data %#v", data)
+
+	if valid && data != nil {
+		sessionUser, err := a.GetUser(data.UserId)
 		if err != nil {
 			return nil, errors.New("could not find session user")
 		}
-		return user, nil
+		return sessionUser, nil
 	}
 	return nil, errors.New("invalid or expired session")
 }
 
 func (a *Api) RefreshUserSession(sessionToken string) string {
-	usr, err := a.AuthenticateUserSession(sessionToken)
+	sessionUser, err := a.AuthenticateUserSession(sessionToken)
 	if err != nil {
-		log.Println(err.Error())
+		a.logger.Println(err.Error())
 		return ""
 	}
-	return usr.SessionRefresh(sessionToken)
+	return sessionUser.SessionRefresh(sessionToken)
 }
 
 func (a *Api) GetUserByEmail(email string) (*user.User, error) {
 	if email == "" {
-		return nil, ErrNoUserid
+		a.logger.Println(ErrNoUserId.Error)
+		return nil, ErrNoUserId.Error
 	}
-	return a.store.GetUserByEmail(email)
+	foundUser, err := a.store.GetUserByEmail(email)
+	if err != nil {
+		a.logger.Println(err.Error())
+	}
+	return foundUser, err
 }
 
-func (a *Api) SaveSmbgs2(src io.Reader, out io.Writer, userid string) error {
+func (a *Api) SaveSmbgs(in io.Reader, out io.Writer, userid string) error {
 	if userid == "" {
-		return ErrNoUserid
+		a.logger.Println(ErrNoUserId.Error)
+		return ErrNoUserId.Error
 	}
 
 	var dbBuffer bytes.Buffer
 
-	smbg.StreamMulti(src, "", "", out, &dbBuffer)
+	smbg.StreamMulti(in, "", "", out, &dbBuffer)
 
 	//log.Println("SaveSmbgs2 Db", string(dbBuffer.Bytes()[:]))
 
-	if err := a.store.AddSmbgs2(userid, dbBuffer.Bytes()); err != nil {
-		log.Println("api/SaveSmbgs", err.Error())
-		return ErrInternalServer
+	if err := a.store.AddSmbgs(userid, dbBuffer.Bytes()); err != nil {
+		a.logger.Println(err.Error())
+		return ErrInternalServer.Error
 	}
 	return nil
 }
 
-func (a *Api) GetSmbgs2(dest io.Writer, userid string) error {
+func (a *Api) GetSmbgs(out io.Writer, userid string) error {
 	if userid == "" {
-		return ErrNoUserid
+		a.logger.Println(ErrNoUserId.Error)
+		return ErrNoUserId.Error
 	}
 
-	smbgs, err := a.store.GetSmbgs2(userid)
+	smbgs, err := a.store.GetSmbgs(userid)
 	//log.Println("GetSmbgs2", string(smbgs[:]))
 	if err != nil {
-		log.Println("api/GetSmbgs", err.Error())
-		return ErrInternalServer
+		a.logger.Println(err.Error())
+		return ErrInternalServer.Error
 	}
 
 	//log.Println("GetSmbgs2 Got ", string(smbgs[:]))
 
-	dest.Write(smbgs)
+	out.Write(smbgs)
 	return nil
 }
-
-/*func (a *Api) SaveSmbgs(src io.Reader, userid string) (smbg.Smbgs, error) {
-	if userid == "" {
-		return nil, ErrNoUserid
-	}
-
-	smbgs := smbg.Decode(src).Set("", "")
-
-	if err := a.store.AddSmbgs(userid, smbgs); err != nil {
-		log.Println("api/SaveSmbgs", err.Error())
-		return nil, ErrInternalServer
-	}
-	return smbgs, nil
-}
-
-func (a *Api) GetSmbgs(dest io.Writer, userid string) error {
-	if userid == "" {
-		return ErrNoUserid
-	}
-
-	smbgs, err := a.store.GetSmbgs(userid)
-	if err != nil {
-		log.Println("api/GetSmbgs", err.Error())
-		return ErrInternalServer
-	}
-
-	err = smbgs.Encode(dest)
-	if err != nil {
-		log.Println("api/GetSmbgs", err.Error())
-		return ErrInternalServer
-	}
-
-	return nil
-}
-func (a *Api) UpdateSmbgs(src io.Reader, userid string) (smbg.Smbgs, error) {
-	if userid == "" {
-		return nil, ErrNoUserid
-	}
-
-	smbgs := smbg.DecodeExisting(src)
-	if err := a.store.AddSmbgs(userid, smbgs); err != nil {
-		log.Println("api/UpdateSmbgs", err.Error())
-		return nil, ErrInternalServer
-	}
-	return smbgs, nil
-}
-*/

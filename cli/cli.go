@@ -112,7 +112,7 @@ func importData(c *cli.Context) {
 
 	if typeOfData == models.EventTypes.Smbg.String() {
 		f := bufio.NewWriter(os.Stdout)
-		saved, err := api.SaveSmbgs2(strings.NewReader(data), f, "a_3455")
+		saved, err := api.SaveSmbgs(strings.NewReader(data), f, "a_3455")
 		if err != nil {
 			log.Println(err, log.Ldate|log.Ltime|log.Lshortfile)
 		}

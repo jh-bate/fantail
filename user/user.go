@@ -18,8 +18,11 @@ const (
 // * When a user logs in to your site via a POST under TLS, determine if the password is valid.
 // * Then issue a random session key, say 50 or more crypto rand characters and stuff in a secure Cookie.
 // * Add that session key to the UserSession table.
-// * Then when you see that user again, first hit the UserSession table to see if the SessionKey is in there with a valid LoginTime and LastSeenTime and User is not deleted. You could design it so a timer automatically clears out old rows in UserSession."
+// * Then when you see that user again, first hit the UserSession table to see if the SessionKey is in
+//   there with a valid LoginTime and LastSeenTime and User is not deleted. You could design it so a timer
+//   automatically clears out old rows in UserSession."
 
+//user we use internally and store
 type User struct {
 	Id       string    `json:"id"`
 	Name     string    `json:"name"`
@@ -27,6 +30,13 @@ type User struct {
 	Hash     string    `json:"hash"`
 	LastSeen time.Time `json:"lastSeen"`
 	Disabled bool      `json:"disabled"`
+}
+
+//user that can be sent out to the world
+type PublishedUser struct {
+	Id    string `json:"id"`
+	Name  string `json:"name"`
+	Email string `json:"email"`
 }
 
 //incoming raw user data used to generate a new user from
@@ -40,6 +50,12 @@ type RawUser struct {
 type TokenData struct {
 	UserId string
 }
+
+const (
+	token_id_claim       = "ID"
+	token_signing_method = "HS256"
+	token_expiry_claim   = "exp"
+)
 
 /*func NewUser(name, email, pw string) *User {
 	u := &User{Id: uuid.NewV4().String(), Name: name, Email: email, Hash: pw}
@@ -80,8 +96,11 @@ func (u *User) Json() []byte {
 	return data
 }
 
+func (u *User) ToPublishedUser() *PublishedUser {
+	return &PublishedUser{Id: u.Id, Email: u.Email, Name: u.Name}
+}
+
 func (u *User) Login() string {
-	//log.Println("Login")
 
 	if u.Disabled {
 		return ""
@@ -89,9 +108,9 @@ func (u *User) Login() string {
 	//set last seen
 	u.LastSeen = time.Now().UTC()
 	//create a token for this user
-	token := jwt.New(jwt.GetSigningMethod("HS256"))
-	token.Claims["ID"] = u.Id
-	token.Claims["exp"] = time.Now().Add(time.Hour * 72).Unix()
+	token := jwt.New(jwt.GetSigningMethod(token_signing_method))
+	token.Claims[token_id_claim] = u.Id
+	token.Claims[token_expiry_claim] = time.Now().Add(time.Hour * 72).Unix()
 	tokenString, err := token.SignedString([]byte(secret))
 	if err != nil {
 		log.Println("Login err", err.Error())
@@ -108,9 +127,9 @@ func (u *User) SessionRefresh(sessionToken string) string {
 		//set last seen
 		u.LastSeen = time.Now().UTC()
 		//create new token
-		token := jwt.New(jwt.GetSigningMethod("HS256"))
-		token.Claims["ID"] = current.Claims["ID"]
-		token.Claims["exp"] = time.Now().Add(time.Hour * 72).Unix()
+		token := jwt.New(jwt.GetSigningMethod(token_signing_method))
+		token.Claims[token_id_claim] = current.Claims[token_id_claim]
+		token.Claims[token_id_claim] = time.Now().Add(time.Hour * 72).Unix()
 		tokenString, err := token.SignedString([]byte(secret))
 		if err != nil {
 			log.Println("SessionRefresh err", err.Error())
@@ -122,7 +141,7 @@ func (u *User) SessionRefresh(sessionToken string) string {
 
 func SessionValid(sessionToken string) (bool, *TokenData) {
 	if current := unpackToken(sessionToken); current != nil {
-		return current.Valid, &TokenData{UserId: current.Claims["id"].(string)}
+		return current.Valid, &TokenData{UserId: current.Claims[token_id_claim].(string)}
 	}
 	return false, nil
 }

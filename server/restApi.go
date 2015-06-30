@@ -14,14 +14,11 @@ import (
 
 var dataApi *client.Api
 
-//var userStore *user.Store
-
 const session_token = "x-dhub-token"
 
 func main() {
 
 	dataApi = client.InitApi(client.NewStore())
-	//userStore = &user.Store{Users: map[string]*user.User{}}
 
 	api := rest.NewApi()
 
@@ -79,15 +76,20 @@ func notImplemented(w rest.ResponseWriter, r *rest.Request) {
 }
 
 func checkAuth(w rest.ResponseWriter, r *rest.Request, handler rest.HandlerFunc) {
+	usr, err := dataApi.AuthenticateUserSession(r.Header.Get(session_token))
 
-	usr, _ := dataApi.AuthenticateUserSession(r.Header.Get(session_token))
-	log.Printf("authenticated user? %#v", usr)
-	/*
-		if err != nil {
-			w.WriteHeader(http.StatusUnauthorized)
-			return
-		}*/
-	handler(w, r)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.WriteJson(err)
+		return
+	}
+	if usr != nil {
+		log.Printf("user authenticated")
+		handler(w, r)
+		return
+	}
+	w.WriteHeader(http.StatusUnauthorized)
+	return
 }
 
 func refresh(w rest.ResponseWriter, r *rest.Request) {
@@ -120,13 +122,13 @@ func login(w rest.ResponseWriter, r *rest.Request) {
 	usr, err := dataApi.GetUserByEmail(pair[0])
 
 	if err != nil {
-		log.Println("login err:", err.Error())
+		log.Println(err.Error(), log.Lshortfile)
 		w.WriteHeader(http.StatusInternalServerError)
 	}
 
 	if usr != nil && usr.Validate(pair[1]) {
 		sessionToken := usr.Login()
-		log.Println("logged in ", sessionToken)
+		log.Println(sessionToken, log.Lshortfile)
 		w.Header().Set(session_token, sessionToken)
 		return
 	}
@@ -140,12 +142,12 @@ func signup(w rest.ResponseWriter, r *rest.Request) {
 
 	savedUsr, err := dataApi.SaveUser(r.Body)
 	if err != nil {
-		log.Println("signup err: ", err.Error())
+		log.Println(err.Error(), log.Lshortfile)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	w.WriteHeader(http.StatusCreated)
-	w.WriteJson(savedUsr)
+	w.WriteJson(savedUsr.ToPublishedUser())
 	return
 }
 
@@ -154,7 +156,7 @@ func getSmbgs(w rest.ResponseWriter, r *rest.Request) {
 
 	var smbgsBuffer bytes.Buffer
 
-	err := dataApi.GetSmbgs2(&smbgsBuffer, userid)
+	err := dataApi.GetSmbgs(&smbgsBuffer, userid)
 
 	//log.Println("getSmbgs ", string(smbgsBuffer.Bytes()[:]))
 
@@ -169,11 +171,10 @@ func getSmbgs(w rest.ResponseWriter, r *rest.Request) {
 }
 
 func postSmbgs(w rest.ResponseWriter, r *rest.Request) {
-
 	userid := r.PathParam("userid")
 
 	var confirmationBuffer bytes.Buffer
-	err := dataApi.SaveSmbgs2(r.Body, &confirmationBuffer, userid)
+	err := dataApi.SaveSmbgs(r.Body, &confirmationBuffer, userid)
 
 	//log.Println("postSmbgs confirmation ", string(confirmationBuffer.Bytes()[:]))
 
