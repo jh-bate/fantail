@@ -5,16 +5,16 @@
 package main
 
 import (
+	"bytes"
 	"flag"
-	"io/ioutil"
 	"log"
 	"net/http"
-	"os"
 	"strconv"
 	"text/template"
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/jh-bate/fantail/client"
 )
 
 const (
@@ -39,7 +39,23 @@ var (
 )
 
 func readFileIfModified(lastMod time.Time) ([]byte, time.Time, error) {
-	fi, err := os.Stat(filename)
+
+	log.Println("check datastore")
+
+	//s := client.NewStore()
+	dataApi := client.InitApi(client.NewStore())
+
+	var buf bytes.Buffer
+	err := dataApi.GetSmbgs(&buf, "213")
+
+	if err != nil {
+		log.Println("error checking store ", err.Error())
+		return nil, lastMod, err
+	}
+
+	log.Println("found data from store")
+
+	/*fi, err := os.Stat(filename)
 	if err != nil {
 		return nil, lastMod, err
 	}
@@ -49,8 +65,8 @@ func readFileIfModified(lastMod time.Time) ([]byte, time.Time, error) {
 	p, err := ioutil.ReadFile(filename)
 	if err != nil {
 		return nil, fi.ModTime(), err
-	}
-	return p, fi.ModTime(), nil
+	}*/
+	return buf.Bytes(), time.Now(), nil
 }
 
 func reader(ws *websocket.Conn) {
@@ -80,6 +96,8 @@ func writer(ws *websocket.Conn, lastMod time.Time) {
 		case <-fileTicker.C:
 			var p []byte
 			var err error
+
+			log.Println("about to check datastore")
 
 			p, lastMod, err = readFileIfModified(lastMod)
 
@@ -155,9 +173,11 @@ func serveHome(w http.ResponseWriter, r *http.Request) {
 func main() {
 	flag.Parse()
 	if flag.NArg() != 1 {
-		log.Fatal("filename not specified")
+		filename = "fantail_data.db"
+		//log.Fatal("filename not specified")
+
 	}
-	filename = flag.Args()[0]
+	//filename = flag.Args()[0]
 	http.HandleFunc("/", serveHome)
 	http.HandleFunc("/ws", serveWs)
 	if err := http.ListenAndServe(*addr, nil); err != nil {

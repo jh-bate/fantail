@@ -13,20 +13,24 @@ import (
 
 type Store struct {
 	logger *log.Logger
+	path   string
 }
 
 const (
-	events_db    = "fantail_data.db"
 	users_bucket = "users"
 )
 
 //store created on a per user basis
-func NewStore() *Store {
-	return &Store{logger: log.New(os.Stdout, "fantail:", log.Lshortfile)}
+func NewStore(storePath string) *Store {
+	if storePath == "" {
+		log.Panic("need the path of where the data will be stored")
+	}
+	return &Store{logger: log.New(os.Stdout, "fantail:", log.Lshortfile), path: storePath}
 }
 
 func (s *Store) open() *bolt.DB {
-	db, err := bolt.Open(events_db, 0600, nil)
+
+	db, err := bolt.Open(s.path, 0600, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -97,7 +101,6 @@ func (s *Store) GetUser(id string) (*user.User, error) {
 	if err != nil {
 		s.logger.Println(err.Error())
 	}
-	s.logger.Println("found user ")
 	return usr, err
 }
 

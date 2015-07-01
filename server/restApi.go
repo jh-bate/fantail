@@ -18,7 +18,7 @@ const session_token = "x-dhub-token"
 
 func main() {
 
-	dataApi = client.InitApi(client.NewStore())
+	dataApi = client.InitApi()
 
 	api := rest.NewApi()
 
@@ -127,7 +127,12 @@ func login(w rest.ResponseWriter, r *rest.Request) {
 	}
 
 	if usr != nil && usr.Validate(pair[1]) {
-		sessionToken := usr.Login()
+		sessionToken, err := dataApi.Login(usr)
+		if err != nil {
+			log.Println(err.Error())
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
 		log.Println(sessionToken, log.Lshortfile)
 		w.Header().Set(session_token, sessionToken)
 		return

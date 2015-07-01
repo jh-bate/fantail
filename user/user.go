@@ -11,10 +11,6 @@ import (
 	"github.com/satori/go.uuid"
 )
 
-const (
-	secret = "WOW,MuchShibe,ToDogge"
-)
-
 // * When a user logs in to your site via a POST under TLS, determine if the password is valid.
 // * Then issue a random session key, say 50 or more crypto rand characters and stuff in a secure Cookie.
 // * Add that session key to the UserSession table.
@@ -100,7 +96,7 @@ func (u *User) ToPublishedUser() *PublishedUser {
 	return &PublishedUser{Id: u.Id, Email: u.Email, Name: u.Name}
 }
 
-func (u *User) Login() string {
+func (u *User) Login(secret string) string {
 
 	if u.Disabled {
 		return ""
@@ -119,11 +115,11 @@ func (u *User) Login() string {
 
 }
 
-func (u *User) SessionRefresh(sessionToken string) string {
+func (u *User) SessionRefresh(sessionToken, secret string) string {
 	if u.Disabled {
 		return ""
 	}
-	if current := unpackToken(sessionToken); current != nil && current.Valid {
+	if current := unpackToken(sessionToken, secret); current != nil && current.Valid {
 		//set last seen
 		u.LastSeen = time.Now().UTC()
 		//create new token
@@ -139,15 +135,15 @@ func (u *User) SessionRefresh(sessionToken string) string {
 	return ""
 }
 
-func SessionValid(sessionToken string) (bool, *TokenData) {
-	if current := unpackToken(sessionToken); current != nil {
+func SessionValid(sessionToken, secret string) (bool, *TokenData) {
+	if current := unpackToken(sessionToken, secret); current != nil {
 		return current.Valid, &TokenData{UserId: current.Claims[token_id_claim].(string)}
 	}
 	return false, nil
 }
 
 //check and if valid return the token after setting the `LastSeen` on the associated User
-func unpackToken(tokenString string) *jwt.Token {
+func unpackToken(tokenString, secret string) *jwt.Token {
 	current, err := jwt.Parse(tokenString, func(t *jwt.Token) ([]byte, error) {
 		return []byte(secret), nil
 	})
