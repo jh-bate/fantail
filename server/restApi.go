@@ -9,16 +9,16 @@ import (
 
 	"github.com/ant0ine/go-json-rest/rest"
 
-	"github.com/jh-bate/fantail/client"
+	"github.com/jh-bate/fantail"
 )
 
-var dataApi *client.Api
+var dataApi *fantail.Api
 
 const session_token = "x-dhub-token"
 
 func main() {
 
-	dataApi = client.InitApi()
+	dataApi = fantail.InitApi()
 
 	api := rest.NewApi()
 

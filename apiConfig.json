@@ -1,0 +1,5 @@
+{
+  "dataStorePath": "/Users/jhbate/go/src/github.com/jh-bate/fantail/server/fantail_data.db",
+  "userStorePath": "/Users/jhbate/go/src/github.com/jh-bate/fantail/server/fantail_users.db",
+  "signingSecret": "WOW,MuchShibe,ToDogge"
+}

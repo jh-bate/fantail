@@ -42,8 +42,7 @@ func readFileIfModified(lastMod time.Time) ([]byte, time.Time, error) {
 
 	log.Println("check datastore")
 
-	//s := client.NewStore()
-	dataApi := client.InitApi(client.NewStore())
+	dataApi := client.InitApi()
 
 	var buf bytes.Buffer
 	err := dataApi.GetSmbgs(&buf, "213")
@@ -54,18 +53,6 @@ func readFileIfModified(lastMod time.Time) ([]byte, time.Time, error) {
 	}
 
 	log.Println("found data from store")
-
-	/*fi, err := os.Stat(filename)
-	if err != nil {
-		return nil, lastMod, err
-	}
-	if !fi.ModTime().After(lastMod) {
-		return nil, lastMod, nil
-	}
-	p, err := ioutil.ReadFile(filename)
-	if err != nil {
-		return nil, fi.ModTime(), err
-	}*/
 	return buf.Bytes(), time.Now(), nil
 }
 
@@ -97,8 +84,6 @@ func writer(ws *websocket.Conn, lastMod time.Time) {
 			var p []byte
 			var err error
 
-			log.Println("about to check datastore")
-
 			p, lastMod, err = readFileIfModified(lastMod)
 
 			if err != nil {
@@ -112,6 +97,7 @@ func writer(ws *websocket.Conn, lastMod time.Time) {
 
 			if p != nil {
 				ws.SetWriteDeadline(time.Now().Add(writeWait))
+
 				if err := ws.WriteMessage(websocket.TextMessage, p); err != nil {
 					return
 				}
