@@ -76,6 +76,7 @@ func (a *Api) Login(usr *users.User) (string, error) {
 
 func (a *Api) LogMetric(data interface{}) {
 	a.metrics.Printf("%v", data)
+	return
 }
 
 func (a *Api) SaveUser(in io.Reader) (*users.User, error) {
