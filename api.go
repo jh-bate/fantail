@@ -21,13 +21,15 @@ type Api struct {
 	dataStore *data.Store
 	userStore *users.Store
 	logger    *log.Logger
+	metrics   *log.Logger
 	*config
 }
 
 type config struct {
-	DataStorePath string `json:"dataStorePath"`
-	UserStorePath string `json:"userStorePath"`
-	Secret        string `json:"signingSecret"`
+	DataStorePath    string `json:"dataStorePath"`
+	UserStorePath    string `json:"userStorePath"`
+	MetricsStorePath string `json:"metricsStorePath"`
+	Secret           string `json:"signingSecret"`
 }
 
 func loadConfig() *config {
@@ -48,10 +50,18 @@ func loadConfig() *config {
 
 func InitApi() *Api {
 	usedConfig := loadConfig()
+
+	f, err := os.OpenFile(usedConfig.MetricsStorePath, os.O_APPEND|os.O_WRONLY, 0600)
+	if err != nil {
+		panic(err)
+	}
+	defer f.Close()
+
 	return &Api{
 		dataStore: data.NewStore(usedConfig.DataStorePath),
 		userStore: users.NewStore(usedConfig.UserStorePath),
 		logger:    log.New(os.Stdout, "fantail/api:", log.Lshortfile),
+		metrics:   log.New(f, "fantail/metrics:", log.Ltime|log.Ldate),
 		config:    usedConfig,
 	}
 }
@@ -62,6 +72,10 @@ func (a *Api) Login(usr *users.User) (string, error) {
 		return token, errors.New("issue trying to login")
 	}
 	return token, nil
+}
+
+func (a *Api) LogMetric(data interface{}) {
+	a.metrics.Printf("%v", data)
 }
 
 func (a *Api) SaveUser(in io.Reader) (*users.User, error) {

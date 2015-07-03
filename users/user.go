@@ -51,6 +51,8 @@ const (
 	token_id_claim       = "ID"
 	token_signing_method = "HS256"
 	token_expiry_claim   = "exp"
+
+	FANTAIL_SESSION_TOKEN = "x-fantail-token"
 )
 
 /*func NewUser(name, email, pw string) *User {

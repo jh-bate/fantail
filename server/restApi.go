@@ -5,20 +5,26 @@ import (
 	"encoding/base64"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/ant0ine/go-json-rest/rest"
-
 	"github.com/jh-bate/fantail"
+
+	"github.com/jh-bate/fantail/users"
 )
 
-var dataApi *fantail.Api
+type fantailApi struct {
+	logger *log.Logger
+	api    *fantail.Api
+}
 
-const session_token = "x-dhub-token"
+var fApi = &fantailApi{
+	api:    fantail.InitApi(),
+	logger: log.New(os.Stdout, "faintail/api", log.Lshortfile),
+}
 
 func main() {
-
-	dataApi = fantail.InitApi()
 
 	api := rest.NewApi()
 
@@ -67,7 +73,7 @@ func main() {
 		log.Fatal(err)
 	}
 	api.SetApp(router)
-	log.Fatal(http.ListenAndServe(":8090", api.MakeHandler()))
+	log.Println(http.ListenAndServe(":8090", api.MakeHandler()))
 }
 
 func notImplemented(w rest.ResponseWriter, r *rest.Request) {
@@ -76,15 +82,12 @@ func notImplemented(w rest.ResponseWriter, r *rest.Request) {
 }
 
 func checkAuth(w rest.ResponseWriter, r *rest.Request, handler rest.HandlerFunc) {
-	usr, err := dataApi.AuthenticateUserSession(r.Header.Get(session_token))
+	usr, err := fApi.api.AuthenticateUserSession(r.Header.Get(users.FANTAIL_SESSION_TOKEN))
 
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.WriteJson(err)
-		return
-	}
-	if usr != nil {
-		log.Printf("user authenticated")
+		fApi.logger.Println(err.Error())
+	} else if usr != nil {
+		fApi.logger.Println("user authenticated")
 		handler(w, r)
 		return
 	}
@@ -93,8 +96,8 @@ func checkAuth(w rest.ResponseWriter, r *rest.Request, handler rest.HandlerFunc)
 }
 
 func refresh(w rest.ResponseWriter, r *rest.Request) {
-	if newToken := dataApi.RefreshUserSession(r.Header.Get(session_token)); newToken != "" {
-		w.Header().Set(session_token, newToken)
+	if newToken := fApi.api.RefreshUserSession(r.Header.Get(users.FANTAIL_SESSION_TOKEN)); newToken != "" {
+		w.Header().Set(users.FANTAIL_SESSION_TOKEN, newToken)
 		return
 	}
 	w.WriteHeader(http.StatusUnauthorized)
@@ -107,6 +110,7 @@ func login(w rest.ResponseWriter, r *rest.Request) {
 	auth := strings.SplitN(r.Header["Authorization"][0], " ", 2)
 
 	if len(auth) != 2 || auth[0] != "Basic" {
+		fApi.logger.Println("Authorization invalid")
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -115,26 +119,27 @@ func login(w rest.ResponseWriter, r *rest.Request) {
 	pair := strings.SplitN(string(payload), ":", 2)
 
 	if len(pair) != 2 {
+		fApi.logger.Println("Authorization invalid")
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 
-	usr, err := dataApi.GetUserByEmail(pair[0])
+	usr, err := fApi.api.GetUserByEmail(pair[0])
 
 	if err != nil {
-		log.Println(err.Error(), log.Lshortfile)
+		fApi.logger.Println(err.Error())
 		w.WriteHeader(http.StatusInternalServerError)
 	}
 
 	if usr != nil && usr.Validate(pair[1]) {
-		sessionToken, err := dataApi.Login(usr)
+		sessionToken, err := fApi.api.Login(usr)
 		if err != nil {
-			log.Println(err.Error())
+			fApi.logger.Println(err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		log.Println(sessionToken, log.Lshortfile)
-		w.Header().Set(session_token, sessionToken)
+		fApi.logger.Println("we have a token")
+		w.Header().Set(users.FANTAIL_SESSION_TOKEN, sessionToken)
 		return
 	}
 
@@ -145,9 +150,9 @@ func login(w rest.ResponseWriter, r *rest.Request) {
 //curl -d '{"email": "jamie@tidepool.org","name":"Jamie Bate", "password": "admin"}' -H "Content-Type:application/json" http://localhost:8090/signup
 func signup(w rest.ResponseWriter, r *rest.Request) {
 
-	savedUsr, err := dataApi.SaveUser(r.Body)
+	savedUsr, err := fApi.api.SaveUser(r.Body)
 	if err != nil {
-		log.Println(err.Error(), log.Lshortfile)
+		fApi.logger.Println(err.Error())
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -161,7 +166,7 @@ func getSmbgs(w rest.ResponseWriter, r *rest.Request) {
 
 	var smbgsBuffer bytes.Buffer
 
-	err := dataApi.GetSmbgs(&smbgsBuffer, userid)
+	err := fApi.api.GetSmbgs(&smbgsBuffer, userid)
 
 	//log.Println("getSmbgs ", string(smbgsBuffer.Bytes()[:]))
 
@@ -179,7 +184,7 @@ func postSmbgs(w rest.ResponseWriter, r *rest.Request) {
 	userid := r.PathParam("userid")
 
 	var confirmationBuffer bytes.Buffer
-	err := dataApi.SaveSmbgs(r.Body, &confirmationBuffer, userid)
+	err := fApi.api.SaveSmbgs(r.Body, &confirmationBuffer, userid)
 
 	//log.Println("postSmbgs confirmation ", string(confirmationBuffer.Bytes()[:]))
 

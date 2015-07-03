@@ -8,18 +8,18 @@ import (
 
 	"github.com/codegangsta/cli"
 
-	"github.com/jh-bate/fantail/client"
-	"github.com/jh-bate/fantail/models"
+	"github.com/jh-bate/fantail"
+	"github.com/jh-bate/fantail/data"
 )
 
 var (
-	api *client.Api
+	api *fantail.Api
 )
 
 func main() {
 
 	app := cli.NewApp()
-	api = client.InitApi(client.NewStore())
+	api = fantail.InitApi()
 
 	app.Name = "D-mate"
 	app.Usage = "Allow you to interact with your diabates data locally"
@@ -91,7 +91,7 @@ func exportData(c *cli.Context) {
 	}
 	defer dataFile.Close()
 
-	if typeOfData == models.EventTypes.Smbg.String() {
+	if typeOfData == data.EventTypes.Smbg.String() {
 		api.GetSmbgs(dataFile, "a_3455")
 	}
 	dataFile.Close()
@@ -107,16 +107,15 @@ func importData(c *cli.Context) {
 		log.Fatal("Please specify the type data to import --type or -t flag.")
 	}
 
-	data := c.String("data")
+	dataToLoad := c.String("data")
 	typeOfData := c.String("type")
 
-	if typeOfData == models.EventTypes.Smbg.String() {
+	if typeOfData == data.EventTypes.Smbg.String() {
 		f := bufio.NewWriter(os.Stdout)
-		saved, err := api.SaveSmbgs(strings.NewReader(data), f, "a_3455")
+		err := api.SaveSmbgs(strings.NewReader(dataToLoad), f, "a_3455")
 		if err != nil {
 			log.Println(err, log.Ldate|log.Ltime|log.Lshortfile)
 		}
-		saved.EncodeAsJson(f)
 	}
 
 }
