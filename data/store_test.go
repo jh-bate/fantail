@@ -3,7 +3,7 @@ package data
 import (
 	"testing"
 
-	"github.com/jh-bate/d-data-cli/models"
+	"github.com/jh-bate/fantail/data/smbg"
 )
 
 func TestStore(t *testing.T) {
@@ -14,9 +14,9 @@ func TestStore(t *testing.T) {
 		device_id  = "test_123_bg"
 	)
 
-	bgs := models.BloodGlucoses{
-		models.NewBloodGlucose().SetCommon(device_id, upload_one, nil),
-		models.NewBloodGlucose().SetCommon(device_id, upload_two, nil),
+	bgs := data.BloodGlucoses{
+		smbg.NewSmbg().SetCommon(device_id, upload_one, nil),
+		smbg.NewSmbg().SetCommon(device_id, upload_two, nil),
 	}
 
 	key := "/data/123/smbg"
@@ -26,7 +26,7 @@ func TestStore(t *testing.T) {
 		t.Fatal("TestStore: Failed Save ", err.Error())
 	}
 
-	var storedBgs models.BloodGlucoses
+	var storedBgs smbg.Smbgs
 
 	err := s.Get(key, &storedBgs)
 	if err != nil {

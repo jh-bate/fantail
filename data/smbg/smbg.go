@@ -7,32 +7,32 @@ import (
 	"log"
 	"time"
 
-	"github.com/jh-bate/d-data-cli/models"
+	"github.com/jh-bate/fantail/data"
 )
 
 // SMBG represents blood glucose from a finger prick or other “self-monitoring” method. These events are point-in-time and look like
 type Smbg struct {
-	models.Common
+	data.Common
 	// the bloodglucose value from a self monitoring device
 	Value float64 `json:"value"`
 }
 
 type Smbgs []*Smbg
 
-var ErrorSmbgValueNotSpecified = fmt.Errorf(models.EventTypes.Smbg.String(), " Value not specified")
+var ErrorSmbgValueNotSpecified = fmt.Errorf(data.EventTypes.Smbg.String(), " Value not specified")
 
 func smbgJsonError(method string, jsonError error) error {
-	return fmt.Errorf("%s.%s: %s", models.EventTypes.Smbg.String(), method, jsonError.Error())
+	return fmt.Errorf("%s.%s: %s", data.EventTypes.Smbg.String(), method, jsonError.Error())
 }
 
 func NewSmbg() *Smbg {
-	s := &Smbg{Common: models.Common{EventType: models.EventTypes.Smbg.String(), CreatedAt: time.Now().UTC().Format(time.RFC3339)}}
+	s := &Smbg{Common: data.Common{EventType: data.EventTypes.Smbg.String(), CreatedAt: time.Now().UTC().Format(time.RFC3339)}}
 	s.SetId()
 	return s
 }
 
 func (m *Smbg) SetCommon(deviceId, uploadId string, payload interface{}) *Smbg {
-	m.Set(models.EventTypes.Smbg, deviceId, uploadId, payload)
+	m.Set(data.EventTypes.Smbg, deviceId, uploadId, payload)
 	return m
 }
 
@@ -78,7 +78,7 @@ func Decode(src io.Reader) Smbgs {
 	dec := json.NewDecoder(src)
 
 	count := 0
-	log.Println(models.EventTypes.Smbg.String(), "streaming ... ")
+	log.Println(data.EventTypes.Smbg.String(), "streaming ... ")
 	for {
 
 		log.Println("count ", count)
