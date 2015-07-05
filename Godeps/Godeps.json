@@ -1,0 +1,24 @@
+{
+	"ImportPath": "github.com/jh-bate/fantail",
+	"GoVersion": "go1.4.2",
+	"Deps": [
+		{
+			"ImportPath": "github.com/boltdb/bolt",
+			"Comment": "data/v1-250-g3ba61af",
+			"Rev": "3ba61af1207e000c185d425b76e7d864518dec63"
+		},
+		{
+			"ImportPath": "github.com/dgrijalva/jwt-go",
+			"Comment": "v1.0.1-2-g1482919",
+			"Rev": "1482919d15c7cbc3c48db6132a5b30d1a9c79bcc"
+		},
+		{
+			"ImportPath": "github.com/jameskeane/bcrypt",
+			"Rev": "c3cd44c1e20fec46baad45b108a45be93394dc8d"
+		},
+		{
+			"ImportPath": "github.com/satori/go.uuid",
+			"Rev": "afe1e2ddf0f05b7c29d388a3f8e76cb15c2231ca"
+		}
+	]
+}
