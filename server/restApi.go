@@ -82,9 +82,8 @@ func notImplemented(w rest.ResponseWriter, r *rest.Request) {
 }
 
 func checkAuth(w rest.ResponseWriter, r *rest.Request, handler rest.HandlerFunc) {
-	usr, err := fApi.api.AuthenticateUserSession(r.Header.Get(users.FANTAIL_SESSION_TOKEN))
 
-	if err != nil {
+	if usr, err := fApi.api.AuthenticateUserSession(r.Header.Get(users.FANTAIL_SESSION_TOKEN)); err != nil {
 		fApi.logger.Println(err.Error())
 	} else if usr != nil {
 		fApi.logger.Println("user authenticated")
@@ -150,7 +149,7 @@ func login(w rest.ResponseWriter, r *rest.Request) {
 //curl -d '{"email": "jamie@tidepool.org","name":"Jamie Bate", "password": "admin"}' -H "Content-Type:application/json" http://localhost:8090/signup
 func signup(w rest.ResponseWriter, r *rest.Request) {
 
-	savedUsr, err := fApi.api.SaveUser(r.Body)
+	savedUsr, err := fApi.api.SignupUser(r.Body)
 	if err != nil {
 		fApi.logger.Println(err.Error())
 		w.WriteHeader(http.StatusBadRequest)
