@@ -20,8 +20,8 @@ import (
 type Api struct {
 	dataStore *data.Store
 	userStore *users.Store
-	logger    *log.Logger
-	metrics   *log.Logger
+	Logger    *log.Logger
+	Metrics   *log.Logger
 	*config
 }
 
@@ -60,8 +60,8 @@ func InitApi() *Api {
 	return &Api{
 		dataStore: data.NewStore(usedConfig.DataStorePath),
 		userStore: users.NewStore(usedConfig.UserStorePath),
-		logger:    log.New(os.Stdout, "fantail/api:", log.Lshortfile),
-		metrics:   log.New(f, "fantail/metrics:", log.Ltime|log.Ldate),
+		Logger:    log.New(os.Stdout, "fantail/api:", log.Lshortfile),
+		Metrics:   log.New(f, "fantail/metrics:", log.Ltime|log.Ldate),
 		config:    usedConfig,
 	}
 }
@@ -74,43 +74,38 @@ func (a *Api) Login(usr *users.User) (string, error) {
 	return token, nil
 }
 
-func (a *Api) LogMetric(data interface{}) {
-	a.metrics.Printf("%v", data)
-	return
-}
-
-func (a *Api) SaveUser(in io.Reader) (*users.User, error) {
+func (a *Api) SignupUser(in io.Reader) (*users.User, error) {
 
 	raw := users.DecodeRaw(in)
 
-	a.logger.Printf("lets check %#v", raw)
+	a.Logger.Printf("lets check %#v", raw)
 	if raw.Valid() {
 		savedUser := raw.NewUser()
-		a.logger.Printf("dup check save! %#v", savedUser.Email)
+		a.Logger.Printf("dup check save! %#v", savedUser.Email)
 		exists, _ := a.userStore.GetUserByEmail(savedUser.Email)
 		if exists != nil {
 
 		}
-		a.logger.Printf("lets save! %#v", savedUser)
+		a.Logger.Printf("lets save! %#v", savedUser)
 		err := a.userStore.AddUser(savedUser)
 		if err != nil {
-			a.logger.Println(err.Error())
+			a.Logger.Println(err.Error())
 			return savedUser, ErrInternalServer.Error
 		}
 		return savedUser, err
 	}
-	a.logger.Println(ErrInvalidSignup.Error)
+	a.Logger.Println(ErrInvalidSignup.Error)
 	return nil, ErrInvalidSignup.Error
 }
 
 func (a *Api) GetUser(id string) (*users.User, error) {
 	if id == "" {
-		a.logger.Println(ErrNoUserId.Error)
+		a.Logger.Println(ErrNoUserId.Error)
 		return nil, ErrNoUserId.Error
 	}
 	foundUser, err := a.userStore.GetUser(id)
 	if err != nil {
-		a.logger.Println(err.Error())
+		a.Logger.Println(err.Error())
 		return nil, ErrInternalServer.Error
 	}
 	return foundUser, nil
@@ -118,9 +113,9 @@ func (a *Api) GetUser(id string) (*users.User, error) {
 
 func (a *Api) AuthenticateUserSession(sessionToken string) (*users.User, error) {
 
-	a.logger.Println("token ", sessionToken)
+	a.Logger.Println("token ", sessionToken)
 	valid, data := users.SessionValid(sessionToken, a.Secret)
-	a.logger.Printf("data %#v", data)
+	a.Logger.Printf("data %#v", data)
 
 	if valid && data != nil {
 		sessionUser, err := a.GetUser(data.UserId)
@@ -135,7 +130,7 @@ func (a *Api) AuthenticateUserSession(sessionToken string) (*users.User, error) 
 func (a *Api) RefreshUserSession(sessionToken string) string {
 	sessionUser, err := a.AuthenticateUserSession(sessionToken)
 	if err != nil {
-		a.logger.Println(err.Error())
+		a.Logger.Println(err.Error())
 		return ""
 	}
 	return sessionUser.SessionRefresh(sessionToken, a.Secret)
@@ -143,19 +138,19 @@ func (a *Api) RefreshUserSession(sessionToken string) string {
 
 func (a *Api) GetUserByEmail(email string) (*users.User, error) {
 	if email == "" {
-		a.logger.Println(ErrNoUserId.Error)
+		a.Logger.Println(ErrNoUserId.Error)
 		return nil, ErrNoUserId.Error
 	}
 	foundUser, err := a.userStore.GetUserByEmail(email)
 	if err != nil {
-		a.logger.Println(err.Error())
+		a.Logger.Println(err.Error())
 	}
 	return foundUser, err
 }
 
 func (a *Api) SaveSmbgs(in io.Reader, out io.Writer, userid string) error {
 	if userid == "" {
-		a.logger.Println(ErrNoUserId.Error)
+		a.Logger.Println(ErrNoUserId.Error)
 		return ErrNoUserId.Error
 	}
 
@@ -164,7 +159,7 @@ func (a *Api) SaveSmbgs(in io.Reader, out io.Writer, userid string) error {
 	smbg.StreamMulti(in, "", "", out, &dbBuffer)
 
 	if err := a.dataStore.AddSmbgs(userid, dbBuffer.Bytes()); err != nil {
-		a.logger.Println(err.Error())
+		a.Logger.Println(err.Error())
 		return ErrInternalServer.Error
 	}
 	return nil
@@ -172,13 +167,13 @@ func (a *Api) SaveSmbgs(in io.Reader, out io.Writer, userid string) error {
 
 func (a *Api) GetSmbgs(out io.Writer, userid string) error {
 	if userid == "" {
-		a.logger.Println(ErrNoUserId.Error)
+		a.Logger.Println(ErrNoUserId.Error)
 		return ErrNoUserId.Error
 	}
 
 	smbgs, err := a.dataStore.GetSmbgs(userid)
 	if err != nil {
-		a.logger.Println(err.Error())
+		a.Logger.Println(err.Error())
 		return ErrInternalServer.Error
 	}
 
