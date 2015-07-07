@@ -2,3 +2,4 @@
 server/server
 *.txt
 *_test.json
+chat/chat
