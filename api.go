@@ -12,6 +12,7 @@ import (
 	"runtime"
 
 	"github.com/jh-bate/fantail/data"
+	"github.com/jh-bate/fantail/data/notes"
 	"github.com/jh-bate/fantail/data/smbgs"
 
 	"github.com/jh-bate/fantail/users"
@@ -178,5 +179,38 @@ func (a *Api) GetSmbgs(out io.Writer, userid string) error {
 	}
 
 	out.Write(smbgsData)
+	return nil
+}
+
+func (a *Api) SaveNotes(in io.Reader, out io.Writer, userid string) error {
+	if userid == "" {
+		a.Logger.Println(ErrNoUserId.Error)
+		return ErrNoUserId.Error
+	}
+
+	var dbBuffer bytes.Buffer
+
+	notes.StreamNew(in, "", "", out, &dbBuffer)
+
+	if err := a.dataStore.AddNotes(userid, dbBuffer.Bytes()); err != nil {
+		a.Logger.Println(err.Error())
+		return ErrInternalServer.Error
+	}
+	return nil
+}
+
+func (a *Api) GetNotes(out io.Writer, userid string) error {
+	if userid == "" {
+		a.Logger.Println(ErrNoUserId.Error)
+		return ErrNoUserId.Error
+	}
+
+	notesData, err := a.dataStore.GetNotes(userid)
+	if err != nil {
+		a.Logger.Println(err.Error())
+		return ErrInternalServer.Error
+	}
+
+	out.Write(notesData)
 	return nil
 }
