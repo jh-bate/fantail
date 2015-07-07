@@ -110,6 +110,9 @@ func Test_Stream_Transport(t *testing.T) {
 			if outBgs[i].UploadId != inBgs[i].UploadId {
 				t.Fatalf("expected[%v] actual[%v]", inBgs[i].UploadId, outBgs[i].UploadId)
 			}
+			if outBgs[i].CreatedAt != inBgs[i].CreatedAt {
+				t.Fatalf("Created data should be the same [%s] [%s]", outBgs[i].CreatedAt, inBgs[i].CreatedAt)
+			}
 		}
 	} else {
 		t.Fatalf(" only[%b] transported records found", out.Len())
