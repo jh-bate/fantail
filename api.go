@@ -12,7 +12,7 @@ import (
 	"runtime"
 
 	"github.com/jh-bate/fantail/data"
-	"github.com/jh-bate/fantail/data/smbg"
+	"github.com/jh-bate/fantail/data/smbgs"
 
 	"github.com/jh-bate/fantail/users"
 )
@@ -156,7 +156,7 @@ func (a *Api) SaveSmbgs(in io.Reader, out io.Writer, userid string) error {
 
 	var dbBuffer bytes.Buffer
 
-	smbg.StreamMulti(in, "", "", out, &dbBuffer)
+	smbgs.StreamNew(in, "", "", out, &dbBuffer)
 
 	if err := a.dataStore.AddSmbgs(userid, dbBuffer.Bytes()); err != nil {
 		a.Logger.Println(err.Error())
@@ -171,12 +171,12 @@ func (a *Api) GetSmbgs(out io.Writer, userid string) error {
 		return ErrNoUserId.Error
 	}
 
-	smbgs, err := a.dataStore.GetSmbgs(userid)
+	smbgsData, err := a.dataStore.GetSmbgs(userid)
 	if err != nil {
 		a.Logger.Println(err.Error())
 		return ErrInternalServer.Error
 	}
 
-	out.Write(smbgs)
+	out.Write(smbgsData)
 	return nil
 }

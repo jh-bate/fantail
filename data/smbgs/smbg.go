@@ -1,4 +1,4 @@
-package smbg
+package smbgs
 
 import (
 	"encoding/json"
@@ -7,32 +7,34 @@ import (
 	"log"
 	"time"
 
-	"github.com/jh-bate/d-data-cli/models"
+	"github.com/jh-bate/fantail/data"
 )
 
 // SMBG represents blood glucose from a finger prick or other “self-monitoring” method. These events are point-in-time and look like
 type Smbg struct {
-	models.Common
+	data.Common
 	// the bloodglucose value from a self monitoring device
 	Value float64 `json:"value"`
 }
 
 type Smbgs []*Smbg
 
-var ErrorSmbgValueNotSpecified = fmt.Errorf(models.EventTypes.Smbg.String(), " Value not specified")
+var ErrorSmbgValueNotSpecified = fmt.Errorf(data.EventTypes.Smbg.String(), " Value not specified")
 
 func smbgJsonError(method string, jsonError error) error {
-	return fmt.Errorf("%s.%s: %s", models.EventTypes.Smbg.String(), method, jsonError.Error())
+	return fmt.Errorf("%s.%s: %s", data.EventTypes.Smbg.String(), method, jsonError.Error())
 }
 
 func NewSmbg() *Smbg {
-	s := &Smbg{Common: models.Common{EventType: models.EventTypes.Smbg.String(), CreatedAt: time.Now().UTC().Format(time.RFC3339)}}
+	s := &Smbg{Common: data.Common{EventType: data.EventTypes.Smbg.String(), CreatedAt: time.Now().UTC().Format(time.RFC3339)}}
 	s.SetId()
 	return s
 }
 
-func (m *Smbg) SetCommon(deviceId, uploadId string, payload interface{}) *Smbg {
-	m.Set(models.EventTypes.Smbg, deviceId, uploadId, payload)
+func (m *Smbg) setBasics(deviceId, uploadId string, payload interface{}) *Smbg {
+	m.DeviceId = deviceId
+	m.UploadId = uploadId
+	m.Payload = payload
 	return m
 }
 
@@ -55,30 +57,33 @@ func (m *Smbg) Validate() (errors []error) {
 	return errors
 }
 
-func (m *Smbg) Json() []byte {
+func (m *Smbg) json() []byte {
 	asJson, _ := json.Marshal(m)
 	return asJson
 }
 
 //stream incoming data and create and then write Smbg values as JSON to all destinations
-func StreamMulti(src io.Reader, deviceId, uploadId string, destinations ...io.Writer) error {
-	smbgs := Decode(src).Set(deviceId, uploadId)
-	mw := io.MultiWriter(destinations...)
-	_, err := mw.Write(smbgs.Json())
+func StreamNew(rawJson io.Reader, deviceId, uploadId string, smbgJson ...io.Writer) error {
+	smbgs := decode(rawJson).set(deviceId, uploadId)
+	mw := io.MultiWriter(smbgJson...)
+	_, err := mw.Write(smbgs.json())
 	return err
 }
 
-//write incoming data to a []byte
-func Write(src io.Reader, deviceId, uploadId string) []byte {
-	return Decode(src).Set(deviceId, uploadId).Json()
+//stream incoming existing smbgs and then write the values as JSON to all destinations
+func StreamExisting(smbgJson io.Reader, smbgJsonOut ...io.Writer) error {
+	smbgs := decodeExisting(smbgJson)
+	mw := io.MultiWriter(smbgJsonOut...)
+	_, err := mw.Write(smbgs.json())
+	return err
 }
 
-func Decode(src io.Reader) Smbgs {
+func decode(src io.Reader) Smbgs {
 	bgs := Smbgs{}
 	dec := json.NewDecoder(src)
 
 	count := 0
-	log.Println(models.EventTypes.Smbg.String(), "streaming ... ")
+	log.Println(data.EventTypes.Smbg.String(), "streaming raw ... ")
 	for {
 
 		log.Println("count ", count)
@@ -99,18 +104,18 @@ func Decode(src io.Reader) Smbgs {
 	return bgs
 }
 
-func DecodeExisting(src io.Reader) Smbgs {
+func decodeExisting(src io.Reader) Smbgs {
 	all := Smbgs{}
 	json.NewDecoder(src).Decode(&all)
 	all.Validate()
 	return all
 }
 
-func (bgs Smbgs) Encode(dest io.Writer) error {
+func (bgs Smbgs) encode(dest io.Writer) error {
 	return json.NewEncoder(dest).Encode(bgs)
 }
 
-func (bgs Smbgs) Json() []byte {
+func (bgs Smbgs) json() []byte {
 	asJson, _ := json.Marshal(&bgs)
 	return asJson
 }
@@ -122,7 +127,7 @@ func (bgs Smbgs) Validate() Smbgs {
 	return bgs
 }
 
-func (bgs Smbgs) Set(deviceId, uploadId string) Smbgs {
+func (bgs Smbgs) set(deviceId, uploadId string) Smbgs {
 	for i := range bgs {
 		bgs[i].UploadId = uploadId
 		bgs[i].DeviceId = deviceId

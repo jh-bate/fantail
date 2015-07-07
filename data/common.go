@@ -72,14 +72,17 @@ type Common struct {
 	// The upload identifier; this field should be the uploadId of the corresponding upload data record.
 	UploadId string `json:"uploadId,omitempty"`
 	// An ISO8601 timestamp with a timezone offset.
-	Time      string `json:"time"`
+	Time string `json:"time"`
+	// An ISO8601 timestamp for when the items was created
 	CreatedAt string `json:"createdAt,omitempty"`
+	// An ISO8601 timestamp for when the item was updated
 	UpdatedAt string `json:"updatedAt,omitempty"`
 	//A “version” for the datum. The original datum will have a datumVersion of 0, the next modification will be 1, and so on
 	DatumVersion int `json:"datumVersion"`
 	//A “version” for the schema. The original schema for the type will have a schemaVersion of 0, the next modification will be 1, and so on
-	SchemaVersion int  `json:"schemaVersion"`
-	Valid         bool `json:"-"`
+	SchemaVersion int `json:"schemaVersion"`
+	//A flag that will indicate if the datum is valid after validation has run
+	Valid bool `json:"-"`
 	// Any object can have a “payload”, which is itself an object with any number of unspecified fields.
 	// This is used to store device-specific data that doesn’t rise to the level of standard, but that is useful to store.
 	// For example, the Dexcom G4 continuous glucose monitor displays “trend arrows”, which are arrows that indicate the general direction of the change in glucose readings – up, down, flat. This information is stored under payload.trend.
