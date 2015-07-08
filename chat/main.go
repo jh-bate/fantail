@@ -27,9 +27,7 @@ var fApi = &fantailApi{
 
 var addr = flag.String("addr", ":8080", "http service address")
 var homeTempl = template.Must(template.ParseFiles("home.html"))
-var loginTempl = template.Must(template.ParseFiles("login.html"))
 var homeHandler = http.HandlerFunc(serveHome)
-var loginHandler = http.HandlerFunc(serveLogin)
 
 func serveHome(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/" {
@@ -42,11 +40,6 @@ func serveHome(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	homeTempl.Execute(w, r.Host)
-}
-
-func serveLogin(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	loginTempl.Execute(w, r.Host)
 }
 
 // serverWs handles websocket requests from the peer.

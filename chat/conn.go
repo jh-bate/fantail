@@ -5,7 +5,6 @@
 package main
 
 import (
-	"fmt"
 	"os"
 	"strings"
 	"time"
@@ -80,9 +79,13 @@ func (c *connection) writePump(ft *fantailApi) {
 				return
 			}
 			//save to api
-			noteString := fmt.Sprintf(`{"creatorId":"%s", "text": "%s"}`, "999-999", string(message[:]))
-			ft.api.SaveNotes(strings.NewReader(noteString), os.Stdout, "999-999")
-			//report in chat
+			eventStr := string(message[:])
+			if strings.Contains(strings.ToLower(eventStr), "note") {
+				ft.api.SaveNotes(strings.NewReader(eventStr), os.Stdout, "999-999")
+			} else if strings.Contains(strings.ToLower(eventStr), "smbg") {
+				ft.api.SaveSmbgs(strings.NewReader(eventStr), os.Stdout, "999-999")
+			}
+			//lets chat!
 			if err := c.write(websocket.TextMessage, message); err != nil {
 				return
 			}

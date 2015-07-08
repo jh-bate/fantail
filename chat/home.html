@@ -7,7 +7,8 @@
     $(function() {
 
     var conn;
-    var msg = $("#msg");
+    var note = $("#noteText");
+    var smbg = $("#smbgText");
     var log = $("#log");
 
     function appendLog(msg) {
@@ -19,15 +20,40 @@
         }
     }
 
-    $("#form").submit(function() {
+    $("#note").submit(function() {
         if (!conn) {
             return false;
         }
-        if (!msg.val()) {
+        if (!note.val()) {
             return false;
         }
-        conn.send(msg.val());
-        msg.val("");
+
+        conn.send(JSON.stringify({
+          type: 'note',
+          text: note.val(),
+          time: new Date().toISOString()
+        }));
+        note.val("");
+        return false
+    });
+
+    $("#bg").submit(function() {
+        if (!conn) {
+            return false;
+        }
+        if (!smbg.val()) {
+            return false;
+        }
+
+        console.log('saving smbg',smbg.val());
+
+        conn.send(JSON.stringify({
+          type: 'smbg',
+          text: smbg.val(),
+          time: new Date().toISOString()
+        }));
+
+        smbg.val("");
         return false
     });
 
@@ -45,23 +71,13 @@
     });
 </script>
 <style type="text/css">
-html {
-    overflow: hidden;
-}
 
-body {
-    overflow: hidden;
-    padding: 0;
-    margin: 0;
-    width: 100%;
-    height: 100%;
-    background: gray;
-}
+input[type=submit]{background:#0b9eb3;color:#fff;}
+input{width:80%%;height:37px;margin:5px;font-size:18px;}
+body{margin:40px auto;max-width:650px;line-height:1.6;font-size:18px;color:#444;padding:0 10px}h1,h2,h3{line-height:1.2}
+
 
 #log {
-    background: white;
-    margin: 0;
-    padding: 0.5em 0.5em 0.5em 0.5em;
     position: absolute;
     top: 0.5em;
     left: 0.5em;
@@ -70,13 +86,22 @@ body {
     overflow: auto;
 }
 
-#form {
+#note {
     padding: 0 0.5em 0 0.5em;
     margin: 0;
     position: absolute;
     bottom: 1em;
     left: 0px;
-    width: 100%;
+    overflow: hidden;
+}
+
+#bg {
+    padding: 0 0.5em 0 0.5em;
+    margin: 0;
+    position: absolute;
+    bottom: 1em;
+    right: 0px;
+    width:30%;
     overflow: hidden;
 }
 
@@ -84,9 +109,17 @@ body {
 </head>
 <body>
 <div id="log"></div>
-<form id="form">
-    <input type="submit" value="Send" />
-    <input type="text" id="msg" size="64"/>
+<div>
+<form id="bg">
+    <input type="submit" value="Add Smbg" />
+    <input type="text" id="smbgText" size="64"/>
 </form>
+</div>
+<div>
+<form id="note">
+    <input type="submit" value="Add Note" />
+    <input type="text" id="noteText" size="64"/>
+</form>
+</div>
 </body>
 </html>
