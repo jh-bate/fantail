@@ -5,6 +5,7 @@
 package main
 
 import (
+	"encoding/json"
 	"os"
 	"strings"
 	"time"
@@ -36,6 +37,8 @@ type connection struct {
 	// The websocket connection.
 	ws *websocket.Conn
 
+	api *fantailApi
+
 	// Buffered channel of outbound messages.
 	send chan []byte
 }
@@ -64,8 +67,34 @@ func (c *connection) write(mt int, payload []byte) error {
 	return c.ws.WriteMessage(mt, payload)
 }
 
+func (c *connection) saveData(rawData []byte) string {
+	var data map[string]interface{}
+	json.Unmarshal(rawData, &data)
+
+	dataUsr, err := c.api.api.AuthenticateUserSession(data["user"].(string))
+
+	if dataUsr != nil {
+		delete(data, "user")
+		data["creatorId"] = dataUsr.Id
+		if jsonData, err := json.Marshal(data); err == nil {
+
+			eventStr := string(jsonData[:])
+
+			if strings.Contains(strings.ToLower(eventStr), "note") {
+				c.api.api.SaveNotes(strings.NewReader(eventStr), os.Stdout, dataUsr.Id)
+				return data["text"].(string)
+			} else if strings.Contains(strings.ToLower(eventStr), "smbg") {
+				c.api.api.SaveSmbgs(strings.NewReader(eventStr), os.Stdout, dataUsr.Id)
+				return data["text"].(string)
+			}
+			return "hmmmm something went wrong there!"
+		}
+	}
+	return err.Error()
+}
+
 // writePump pumps messages from the hub to the websocket connection.
-func (c *connection) writePump(ft *fantailApi) {
+func (c *connection) writePump() {
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
 		ticker.Stop()
@@ -79,14 +108,9 @@ func (c *connection) writePump(ft *fantailApi) {
 				return
 			}
 			//save to api
-			eventStr := string(message[:])
-			if strings.Contains(strings.ToLower(eventStr), "note") {
-				ft.api.SaveNotes(strings.NewReader(eventStr), os.Stdout, "999-999")
-			} else if strings.Contains(strings.ToLower(eventStr), "smbg") {
-				ft.api.SaveSmbgs(strings.NewReader(eventStr), os.Stdout, "999-999")
-			}
+			chatMessage := c.saveData(message)
 			//lets chat!
-			if err := c.write(websocket.TextMessage, message); err != nil {
+			if err := c.write(websocket.TextMessage, []byte(chatMessage)); err != nil {
 				return
 			}
 		case <-ticker.C:

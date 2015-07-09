@@ -14,12 +14,14 @@ type DetailedError struct {
 }
 
 var (
-	ErrInvalidSignup  = &DetailedError{Error: errors.New("key is invalid or of invalid type"), Status: http.StatusBadRequest}
-	ErrInvalidSession = &DetailedError{Error: errors.New("invalid or expired session"), Status: http.StatusUnauthorized}
-	ErrNoToken        = &DetailedError{Error: errors.New("no token present in request"), Status: http.StatusBadRequest}
-	ErrNoUserId       = &DetailedError{Error: errors.New("no userid was set"), Status: http.StatusBadRequest}
-	ErrInvalidRequest = &DetailedError{Error: errors.New("you are missing prerequisites for the request"), Status: http.StatusBadRequest}
-	ErrInternalServer = &DetailedError{Error: errors.New("something went wrong"), Status: http.StatusInternalServerError}
+	ErrInvalidSignup  = &DetailedError{Error: errors.New("fantail: key is invalid or of invalid type"), Status: http.StatusBadRequest}
+	ErrInvalidSession = &DetailedError{Error: errors.New("fantail: invalid or expired session"), Status: http.StatusUnauthorized}
+	ErrNoToken        = &DetailedError{Error: errors.New("fantail: no token present in request"), Status: http.StatusBadRequest}
+	ErrNoUserId       = &DetailedError{Error: errors.New("fantail: no userid was set"), Status: http.StatusBadRequest}
+	ErrInvalidRequest = &DetailedError{Error: errors.New("fantail: you are missing prerequisites for the request"), Status: http.StatusBadRequest}
+	ErrInternalServer = &DetailedError{Error: errors.New("fantail: something went wrong"), Status: http.StatusInternalServerError}
+	ErrLoadingConfig  = &DetailedError{Error: errors.New("fantail: could not load config"), Status: http.StatusInternalServerError}
+	ErrLogin          = &DetailedError{Error: errors.New("fantail: could not login"), Status: http.StatusInternalServerError}
 )
 
 //id for tracking error to logged instance
