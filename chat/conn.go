@@ -37,7 +37,7 @@ type connection struct {
 	// The websocket connection.
 	ws *websocket.Conn
 
-	api *fantailApi
+	fantail *Fantail
 
 	// Buffered channel of outbound messages.
 	send chan []byte
@@ -71,7 +71,7 @@ func (c *connection) saveData(rawData []byte) string {
 	var data map[string]interface{}
 	json.Unmarshal(rawData, &data)
 
-	dataUsr, err := c.api.api.AuthenticateUserSession(data["user"].(string))
+	dataUsr, err := c.fantail.api.AuthenticateUserSession(data["user"].(string))
 
 	if dataUsr != nil {
 		delete(data, "user")
@@ -81,10 +81,10 @@ func (c *connection) saveData(rawData []byte) string {
 			eventStr := string(jsonData[:])
 
 			if strings.Contains(strings.ToLower(eventStr), "note") {
-				c.api.api.SaveNotes(strings.NewReader(eventStr), os.Stdout, dataUsr.Id)
+				c.fantail.api.SaveNotes(strings.NewReader(eventStr), os.Stdout, dataUsr.Id)
 				return data["text"].(string)
 			} else if strings.Contains(strings.ToLower(eventStr), "smbg") {
-				c.api.api.SaveSmbgs(strings.NewReader(eventStr), os.Stdout, dataUsr.Id)
+				c.fantail.api.SaveSmbgs(strings.NewReader(eventStr), os.Stdout, dataUsr.Id)
 				return data["text"].(string)
 			}
 			return "hmmmm something went wrong there!"

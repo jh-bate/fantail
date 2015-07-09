@@ -17,18 +17,18 @@ import (
 	"github.com/jh-bate/fantail/users"
 )
 
-type fantailApi struct {
+type Fantail struct {
 	logger *log.Logger
 	api    *fantail.Api
 }
 
-var fApi = &fantailApi{
+var f = &Fantail{
 	api:    fantail.InitApi(),
 	logger: log.New(os.Stdout, "faintail/chat", log.Lshortfile),
 }
 
 var addr = flag.String("addr", ":8080", "http service address")
-var homeTempl = template.Must(template.ParseFiles("home.html"))
+var homeTempl = template.Must(template.ParseFiles("./static/home.html"))
 
 var homeHandler = http.HandlerFunc(serveHome)
 
@@ -51,7 +51,7 @@ func serveWs(w http.ResponseWriter, r *http.Request) {
 		log.Println(err)
 		return
 	}
-	c := &connection{send: make(chan []byte, 256), ws: ws, api: fApi}
+	c := &connection{send: make(chan []byte, 256), ws: ws, fantail: f}
 	h.register <- c
 	go c.writePump()
 	c.readPump()
@@ -62,7 +62,7 @@ func loginUser(w http.ResponseWriter, r *http.Request) {
 	auth := strings.SplitN(r.Header["Authorization"][0], " ", 2)
 
 	if len(auth) != 2 || auth[0] != "Basic" {
-		fApi.logger.Println("Authorization invalid")
+		f.logger.Println("Authorization invalid")
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -71,21 +71,21 @@ func loginUser(w http.ResponseWriter, r *http.Request) {
 	pair := strings.SplitN(string(payload), ":", 2)
 
 	if len(pair) != 2 {
-		fApi.logger.Println("Authorization invalid")
+		f.logger.Println("Authorization invalid")
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 
-	usr, err := fApi.api.GetUserByEmail(pair[0])
+	usr, err := f.api.GetUserByEmail(pair[0])
 	if err != nil {
-		fApi.logger.Println(err.Error())
+		f.logger.Println(err.Error())
 		w.WriteHeader(http.StatusInternalServerError)
 	}
 
 	if usr != nil && usr.Validate(pair[1]) {
-		sessionToken, err := fApi.api.Login(usr)
+		sessionToken, err := f.api.Login(usr)
 		if err != nil {
-			fApi.logger.Println(err.Error())
+			f.logger.Println(err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
@@ -95,21 +95,6 @@ func loginUser(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusForbidden)
 	return
-}
-
-func validateAuthMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fApi.logger.Println("Executing validateAuthMiddleware")
-		if usr, err := fApi.api.AuthenticateUserSession(r.Header.Get(users.FANTAIL_SESSION_TOKEN)); err != nil {
-			fApi.logger.Println(err.Error())
-		} else if usr != nil {
-			fApi.logger.Println("user authenticated")
-			next.ServeHTTP(w, r)
-			return
-		}
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	})
 }
 
 func main() {
