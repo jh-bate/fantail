@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>Chat Example</title>
+<script src="//ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
+<script type="text/javascript">
+$(function() {
+//variables
+  var conn;
+  var note = $("#noteText");
+  var smbg = $("#smbgText");
+  var log = $("#log");
+//log messages
+  function appendLog(msg) {
+      var d = log[0]
+      var doScroll = d.scrollTop == d.scrollHeight - d.clientHeight;
+      msg.appendTo(log)
+      if (doScroll) {
+          d.scrollTop = d.scrollHeight - d.clientHeight;
+      }
+  }
+  $( "#logout" ).click(function( event ) {
+    event.preventDefault();
+    localStorage.setItem('x-fantail-token',null);
+    $('#auth').removeClass('hidden').addClass('visible');
+    $('#app').removeClass('visible').addClass('hidden');
+    return false;
+  });
+  //login
+  $( "#login" ).submit(function( event ) {
+    event.preventDefault();
+
+    var un = $("#name").val();
+    var pw = $("#password").val();
+
+    if(un === "" || pw === ""){
+      return false;
+    }
+    //reset
+    $("#name").val("");
+    $("#password").val("");
+
+    var loginPost = $.ajax
+    ({
+      type: "POST",
+      url: "/login",
+      dataType: 'json',
+      async: false,
+      headers: {
+        "Authorization": "Basic " + btoa(un + ":" + pw)
+      }
+    });
+
+    loginPost.always(function( data ) {
+      alert( "Login Data: " + data );
+      if (loginPost.getResponseHeader('x-fantail-token') !== null) {
+        localStorage.setItem('x-fantail-token',loginPost.getResponseHeader('x-fantail-token'));
+        $('#auth').removeClass('visible').addClass('hidden');
+        $('#app').removeClass('hidden').addClass('visible');
+      }
+    });
+
+    return false;
+  });
+
+  $("#data").submit(function() {
+      if (!conn) {
+          return false;
+      }
+      if (!smbg.val() && !note.val()) {
+          return false;
+      }
+      if (localStorage.getItem('x-fantail-token') === null) {
+        return false;
+      }
+
+      if (note.val()) {
+        console.log('saving note ...');
+        conn.send(JSON.stringify({
+          type: 'note',
+          user: localStorage.getItem('x-fantail-token'),
+          text: note.val(),
+          time: new Date().toISOString()
+        }));
+        note.val('');
+      }
+
+      if (smbg.val()) {
+        console.log('saving smbg ...');
+
+        conn.send(JSON.stringify({
+          type: 'smbg',
+          value: smbg.val(),
+          user: localStorage.getItem('x-fantail-token'),
+          time: new Date().toISOString()
+        }));
+
+        smbg.val('');
+      }
+
+      return false
+  });
+//setup
+  if (window["WebSocket"]) {
+
+    if (localStorage.getItem('x-fantail-token') !== null) {
+      $('#auth').removeClass('visible').addClass('hidden');
+      $('#app').removeClass('hidden').addClass('visible');
+    } else {
+      $('#auth').removeClass('hidden').addClass('visible');
+      $('#app').removeClass('visible').addClass('hidden');
+    }
+
+    conn = new WebSocket("ws://{{$}}/ws/fantail");
+    conn.onclose = function(evt) {
+        appendLog($("<h2>Connection closed.</h2>"))
+    }
+    conn.onmessage = function(evt) {
+        appendLog($("<div/>").text(evt.data))
+    }
+  } else {
+      appendLog($("<h2>Your browser does not support WebSockets.</h2>"))
+  }
+});
+</script>
+<style type="text/css">
+
+input[type=submit]{background:#444;color:#fff;}
+input{height:37px;margin:5px;font-size:18px;}
+body{margin:40px auto;max-width:650px;line-height:1.6;font-size:18px;color:#444;padding:0 10px}h1,h2,h3{line-height:1.2}
+
+.hidden{
+  display: none;
+}
+
+.visible{
+  display:block;
+}
+
+#data {
+  position: absolute;
+  bottom: 1em;
+}
+
+#logout {
+  position: absolute;
+  top: 1em;
+}
+
+</style>
+</head>
+<body>
+  <div id="auth">
+    <form id="login">
+        <label for="name">Email</label>
+        <input type="text" id="name" name="name">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password">
+        <input type="submit" value="Login" />
+    </form>
+  </div>
+  <div id="app">
+    <p><a href="" id="logout">Logout</a></p>
+    <div id="log">
+    </div>
+    <div>
+      <form id="data">
+        <input type="text" id="smbgText" placeholder="bg e.g. 10.7">
+        <input type="text" id="noteText" placeholder="any notes?">
+        <input type="submit" value="Save" />
+      </form>
+    </div>
+  </div>
+</body>
+</html>

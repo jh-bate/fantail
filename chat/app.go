@@ -13,6 +13,8 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/gorilla/mux"
+
 	"github.com/jh-bate/fantail"
 	"github.com/jh-bate/fantail/users"
 )
@@ -28,7 +30,7 @@ var f = &Fantail{
 }
 
 var addr = flag.String("addr", ":8080", "http service address")
-var homeTempl = template.Must(template.ParseFiles("./static/home.html"))
+var homeTempl = template.Must(template.ParseFiles("./static/index.html"))
 
 var homeHandler = http.HandlerFunc(serveHome)
 
@@ -40,12 +42,6 @@ func serveHome(w http.ResponseWriter, r *http.Request) {
 // serverWs handles websocket requests from the peer.
 func serveWs(w http.ResponseWriter, r *http.Request) {
 
-	log.Printf("ws token %s", r.FormValue("user"))
-
-	if r.Method != "GET" {
-		http.Error(w, "Method not allowed", 405)
-		return
-	}
 	ws, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Println(err)
@@ -101,9 +97,12 @@ func main() {
 	flag.Parse()
 	go h.run()
 
-	http.Handle("/", homeHandler)
-	http.HandleFunc("/login", loginUser)
-	http.HandleFunc("/ws", serveWs)
+	r := mux.NewRouter()
+	r.HandleFunc("/", homeHandler)
+
+	r.HandleFunc("/login", loginUser).Methods("POST")
+	r.HandleFunc("/ws/fantail", serveWs).Methods("GET")
+	http.Handle("/", r)
 	err := http.ListenAndServe(*addr, nil)
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)
