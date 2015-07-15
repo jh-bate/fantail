@@ -7,6 +7,7 @@ package main
 import (
 	"encoding/json"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -67,7 +68,7 @@ func (c *connection) write(mt int, payload []byte) error {
 	return c.ws.WriteMessage(mt, payload)
 }
 
-func (c *connection) saveData(rawData []byte) string {
+func (c *connection) saveData(rawData []byte) (display string, feedback []string) {
 	var data map[string]interface{}
 	json.Unmarshal(rawData, &data)
 
@@ -82,15 +83,24 @@ func (c *connection) saveData(rawData []byte) string {
 
 			if strings.Contains(strings.ToLower(eventStr), "note") {
 				c.fantail.api.SaveNotes(strings.NewReader(eventStr), os.Stdout, dataUsr.Id)
-				return data["text"].(string)
+				return data["text"].(string), nil
 			} else if strings.Contains(strings.ToLower(eventStr), "smbg") {
 				c.fantail.api.SaveSmbgs(strings.NewReader(eventStr), os.Stdout, dataUsr.Id)
-				return data["text"].(string)
+
+				smbgVal, _ := strconv.ParseFloat(data["value"].(string), 64)
+
+				if smbgVal > 10 {
+					return data["value"].(string), []string{"thanks ...", "any notes to add?", "any changes in your routine?"}
+				} else if smbgVal < 4 {
+					return data["value"].(string), []string{"time to eat?", "remember to retest after 15 mins of treating a low", "and maybe add a note later"}
+				}
+
+				return data["value"].(string), []string{"nice work!", "is anything thats worth noting?"}
 			}
-			return "hmmmm something went wrong there!"
+			return "hmmmm something went wrong there!", nil
 		}
 	}
-	return err.Error()
+	return err.Error(), nil
 }
 
 // writePump pumps messages from the hub to the websocket connection.
@@ -108,10 +118,16 @@ func (c *connection) writePump() {
 				return
 			}
 			//save to api
-			chatMessage := c.saveData(message)
+			chatMessage, feedback := c.saveData(message)
 			//lets chat!
 			if err := c.write(websocket.TextMessage, []byte(chatMessage)); err != nil {
 				return
+			}
+			for i := range feedback {
+				time.Sleep(time.Second * 1) //brief pause
+				if err := c.write(websocket.TextMessage, []byte(feedback[i])); err != nil {
+					return
+				}
 			}
 		case <-ticker.C:
 			if err := c.write(websocket.PingMessage, []byte{}); err != nil {
