@@ -1,4 +1,4 @@
-package smbg
+package smbgs
 
 import (
 	"bytes"
@@ -9,6 +9,8 @@ import (
 	"testing"
 
 	"net/http/httptest"
+
+	"github.com/jh-bate/fantail/data"
 )
 
 const UPLOAD_ID, DEVICE_ID = "u_123", "d_123"
@@ -17,8 +19,12 @@ func Test_NewSmbg(t *testing.T) {
 
 	bg := NewSmbg()
 
-	if bg.EventType != EventTypes.Smbg.String() {
-		t.Fatalf("NewBloodGlucose: expected [%s] got [%s] ", EventTypes.Smbg.String(), bg.EventType)
+	if bg.EventType != data.EventTypes.Smbg.String() {
+		t.Fatalf("NewSmbg: expected [%s] got [%s] ", data.EventTypes.Smbg.String(), bg.EventType)
+	}
+
+	if bg.Id == "" {
+		t.Fatal("NewSmbg: expects and Id is set on creation")
 	}
 
 	if errors := bg.Validate(); len(errors) == 0 {
@@ -34,9 +40,9 @@ func createFile(name string) *os.File {
 	return f
 }
 
-func Test_StreamMulti_ToFileAndResponse(t *testing.T) {
+func Test_StreamNew_ToFileAndResponse(t *testing.T) {
 
-	const test_file = "_StreamNewBloodGlucoses"
+	const test_file = "StreamNewSmbgs_test.json"
 
 	const bgsStream = `
 	{"value":9.9, "time": "2015-06-10T01:42:19.419Z"}
@@ -50,7 +56,7 @@ func Test_StreamMulti_ToFileAndResponse(t *testing.T) {
 	f := createFile(test_file)
 	defer f.Close()
 
-	StreamMulti(strings.NewReader(bgsStream), DEVICE_ID, UPLOAD_ID, f, rec)
+	StreamNew(strings.NewReader(bgsStream), DEVICE_ID, UPLOAD_ID, f, rec)
 
 	testFile, err := ioutil.ReadFile(test_file)
 	if err != nil {
@@ -58,7 +64,7 @@ func Test_StreamMulti_ToFileAndResponse(t *testing.T) {
 	}
 
 	//File
-	var bgs_2 BloodGlucoses
+	var bgs_2 Smbgs
 	json.Unmarshal(testFile, &bgs_2)
 
 	if len(bgs_2) != 4 {
@@ -82,26 +88,33 @@ func Test_StreamMulti_ToFileAndResponse(t *testing.T) {
 	}
 
 }
-func Test_Smbgs_Transport(t *testing.T) {
-	var network bytes.Buffer // Stand-in for the network.
+func Test_Stream_Transport(t *testing.T) {
+	var in bytes.Buffer // Stand-in for the network.
+	var out bytes.Buffer
 
-	bgs := Smbgs{
-		NewSmbg().SetCommon(DEVICE_ID, UPLOAD_ID, nil),
-		NewSmbg().SetCommon(DEVICE_ID, "UPLlod_other", nil),
+	inBgs := Smbgs{
+		NewSmbg().setBasics(DEVICE_ID, UPLOAD_ID, nil),
+		NewSmbg().setBasics(DEVICE_ID, "UPLlod_other", nil),
 	}
 
-	bgs.Encode(&network)
+	//i.e as a byte stream
+	inBgs.encode(&in)
 
-	otherSideBgs := DecodeExisting(&network)
+	StreamExisting(&in, &out)
 
-	if len(otherSideBgs) == 2 {
+	outBgs := decodeExisting(&out)
 
-		for i := range otherSideBgs {
-			if otherSideBgs[i].UploadId != bgs[i].UploadId {
-				t.Fatalf("expected[%v] actual[%v]", bgs[i].UploadId, otherSideBgs[i].UploadId)
+	if len(outBgs) == 2 {
+
+		for i := range outBgs {
+			if outBgs[i].UploadId != inBgs[i].UploadId {
+				t.Fatalf("expected[%v] actual[%v]", inBgs[i].UploadId, outBgs[i].UploadId)
+			}
+			if outBgs[i].CreatedAt != inBgs[i].CreatedAt {
+				t.Fatalf("Created data should be the same [%s] [%s]", outBgs[i].CreatedAt, inBgs[i].CreatedAt)
 			}
 		}
 	} else {
-		t.Fatalf(" only[%b] transported records found", len(otherSideBgs))
+		t.Fatalf(" only[%b] transported records found", out.Len())
 	}
 }

@@ -53,8 +53,12 @@ func main() {
 		}),
 		rest.Put("/data/:userid/smbgs", notImplemented),
 
-		rest.Get("/data/:userid/notes", notImplemented),
-		rest.Post("/data/:userid/notes", notImplemented),
+		rest.Get("/data/:userid/notes", func(w rest.ResponseWriter, r *rest.Request) {
+			checkAuth(w, r, getNotes)
+		}),
+		rest.Post("/data/:userid/notes", func(w rest.ResponseWriter, r *rest.Request) {
+			checkAuth(w, r, postNotes)
+		}),
 		rest.Put("/data/:userid/notes", notImplemented),
 
 		rest.Get("/data/:userid/basals", notImplemented),
@@ -184,6 +188,44 @@ func postSmbgs(w rest.ResponseWriter, r *rest.Request) {
 
 	var confirmationBuffer bytes.Buffer
 	err := fApi.api.SaveSmbgs(r.Body, &confirmationBuffer, userid)
+
+	//log.Println("postSmbgs confirmation ", string(confirmationBuffer.Bytes()[:]))
+
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		jsonErr, _ := w.EncodeJson(err)
+		w.WriteJson(jsonErr)
+		return
+	}
+	w.WriteHeader(http.StatusCreated)
+	w.(http.ResponseWriter).Write(confirmationBuffer.Bytes())
+	return
+}
+
+func getNotes(w rest.ResponseWriter, r *rest.Request) {
+	userid := r.PathParam("userid")
+
+	var notesBuffer bytes.Buffer
+
+	err := fApi.api.GetNotes(&notesBuffer, userid)
+
+	//log.Println("getSmbgs ", string(smbgsBuffer.Bytes()[:]))
+
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		jsonErr, _ := w.EncodeJson(err)
+		w.WriteJson(jsonErr)
+		return
+	}
+	w.(http.ResponseWriter).Write(notesBuffer.Bytes())
+	return
+}
+
+func postNotes(w rest.ResponseWriter, r *rest.Request) {
+	userid := r.PathParam("userid")
+
+	var confirmationBuffer bytes.Buffer
+	err := fApi.api.SaveNotes(r.Body, &confirmationBuffer, userid)
 
 	//log.Println("postSmbgs confirmation ", string(confirmationBuffer.Bytes()[:]))
 
