@@ -63,7 +63,36 @@ $(function() {
     return false;
   });
 
-  $("#data").submit(function() {
+  $("#note").submit(function(e) {
+      e.preventDefault();
+      if (!conn) {
+          return false;
+      }
+      if (!note.val()) {
+          console.l
+          return false;
+      }
+      if (localStorage.getItem('x-fantail-token') === null) {
+        return false;
+      }
+
+      if (note.val()) {
+        console.log('saving note ...');
+        conn.send(JSON.stringify({
+          type: 'note',
+          user: localStorage.getItem('x-fantail-token'),
+          data:{
+            text: note.val()
+          },
+          time: new Date().toISOString()
+        }));
+        note.val('');
+      }
+
+      return false
+  });
+  $("#data").submit(function(e) {
+      e.preventDefault();
       if (!conn) {
           return false;
       }
@@ -79,7 +108,9 @@ $(function() {
         conn.send(JSON.stringify({
           type: 'note',
           user: localStorage.getItem('x-fantail-token'),
-          text: note.val(),
+          data:{
+            text: note.val()
+          },
           time: new Date().toISOString()
         }));
         note.val('');
@@ -90,8 +121,11 @@ $(function() {
 
         conn.send(JSON.stringify({
           type: 'smbg',
-          value: smbg.val(),
           user: localStorage.getItem('x-fantail-token'),
+          data:{
+            value: parseFloat(smbg.val()),
+            units:'mmol/l'
+          },
           time: new Date().toISOString()
         }));
 
@@ -117,6 +151,10 @@ $(function() {
     }
     conn.onmessage = function(evt) {
         appendLog($("<div/>").text(evt.data))
+        if (evt.data.indexOf("?") > -1) {
+          noteForm = "<div><form id=\"note\"><input type=\"text\" id=\"noteText\"><input type=\"submit\" value=\"Yep\" /><input type=\"submit\" value=\"Nah\" /></form></div>";
+          appendLog($(noteForm))
+        }
     }
   } else {
       appendLog($("<h2>Your browser does not support WebSockets.</h2>"))
@@ -166,7 +204,6 @@ body{margin:40px auto;max-width:650px;line-height:1.6;font-size:18px;color:#444;
     <div>
       <form id="data">
         <input type="text" id="smbgText" placeholder="bg e.g. 10.7">
-        <input type="text" id="noteText" placeholder="any notes?">
         <input type="submit" value="Save" />
       </form>
     </div>

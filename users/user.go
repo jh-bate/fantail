@@ -55,12 +55,6 @@ const (
 	FANTAIL_SESSION_TOKEN = "x-fantail-token"
 )
 
-/*func NewUser(name, email, pw string) *User {
-	u := &User{Id: uuid.NewV4().String(), Name: name, Email: email, Hash: pw}
-	u.Encrypt()
-	return u
-}*/
-
 func DecodeRaw(src io.Reader) *RawUser {
 
 	dec := json.NewDecoder(src)

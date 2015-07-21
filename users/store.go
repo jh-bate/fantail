@@ -64,10 +64,11 @@ func (s *Store) GetUserByEmail(email string) (*User, error) {
 
 			json.Unmarshal(v, &usr)
 			if strings.ToLower(usr.Email) == strings.ToLower(email) {
+				s.logger.Println("Match found")
 				return nil
 			}
 		}
-		s.logger.Println("No match found for ", email)
+		s.logger.Println("No match found")
 		//no match found
 		usr = nil
 		return nil
@@ -75,7 +76,6 @@ func (s *Store) GetUserByEmail(email string) (*User, error) {
 	if err != nil {
 		s.logger.Println(err.Error())
 	}
-	s.logger.Printf("Found user")
 	return usr, err
 }
 

@@ -6,12 +6,13 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/jh-bate/fantail"
 )
 
 const (
@@ -38,7 +39,7 @@ type connection struct {
 	// The websocket connection.
 	ws *websocket.Conn
 
-	fantail *Fantail
+	api *fantail.Api
 
 	// Buffered channel of outbound messages.
 	send chan []byte
@@ -72,7 +73,7 @@ func (c *connection) saveData(rawData []byte) (display string, feedback []string
 	var data map[string]interface{}
 	json.Unmarshal(rawData, &data)
 
-	dataUsr, err := c.fantail.api.AuthenticateUserSession(data["user"].(string))
+	dataUsr, err := c.api.AuthenticateUserSession(data["user"].(string))
 
 	if dataUsr != nil {
 		delete(data, "user")
@@ -81,21 +82,20 @@ func (c *connection) saveData(rawData []byte) (display string, feedback []string
 
 			eventStr := string(jsonData[:])
 
-			if strings.Contains(strings.ToLower(eventStr), "note") {
-				c.fantail.api.SaveNotes(strings.NewReader(eventStr), os.Stdout, dataUsr.Id)
-				return data["text"].(string), nil
-			} else if strings.Contains(strings.ToLower(eventStr), "smbg") {
-				c.fantail.api.SaveSmbgs(strings.NewReader(eventStr), os.Stdout, dataUsr.Id)
+			c.api.SaveEvents(strings.NewReader(eventStr), os.Stdout, dataUsr.Id)
+			if strings.Contains(strings.ToLower(data["type"].(string)), "note") {
+				note := data["data"].(map[string]interface{})
+				return note["text"].(string), nil
+			} else if strings.Contains(strings.ToLower(data["type"].(string)), "smbg") {
+				smbg := data["data"].(map[string]interface{})["value"].(float64)
 
-				smbgVal, _ := strconv.ParseFloat(data["value"].(string), 64)
-
-				if smbgVal > 10 {
-					return data["value"].(string), []string{"thanks ...", "any notes to add?", "any changes in your routine?"}
-				} else if smbgVal < 4 {
-					return data["value"].(string), []string{"time to eat?", "remember to retest after 15 mins of treating a low", "and maybe add a note later"}
+				if smbg > 10 {
+					return fmt.Sprintf("%.1f", smbg), []string{"good work on taking a BG", "was that expected or un-expected?", "any notes you would like to add?"}
+				} else if smbg < 4 {
+					return fmt.Sprintf("%.1f", smbg), []string{"good work on taking a BG", "time to eat?", "remember to retest after 15 mins of treating a low", "and maybe add a note later so we can workout what might have gone wrong"}
 				}
 
-				return data["value"].(string), []string{"nice work!", "is anything thats worth noting?"}
+				return fmt.Sprintf("%.1f", smbg), []string{"awesome work - anything that is note worthy?"}
 			}
 			return "hmmmm something went wrong there!", nil
 		}

@@ -14,12 +14,14 @@ import (
 	"github.com/jh-bate/fantail/data"
 	"github.com/jh-bate/fantail/data/notes"
 	"github.com/jh-bate/fantail/data/smbgs"
+	"github.com/jh-bate/fantail/events"
 
 	"github.com/jh-bate/fantail/users"
 )
 
 type Api struct {
 	dataStore *data.Store
+	eStore    *events.Store
 	userStore *users.Store
 	Logger    *log.Logger
 	Metrics   *log.Logger
@@ -60,6 +62,7 @@ func InitApi() *Api {
 
 	return &Api{
 		dataStore: data.NewStore(usedConfig.DataStorePath),
+		eStore:    events.NewStore(usedConfig.DataStorePath),
 		userStore: users.NewStore(usedConfig.UserStorePath),
 		Logger:    log.New(os.Stdout, "fantail/api:", log.Lshortfile),
 		Metrics:   log.New(f, "fantail/metrics:", log.Ltime|log.Ldate),
@@ -147,6 +150,39 @@ func (a *Api) GetUserByEmail(email string) (*users.User, error) {
 		a.Logger.Println(err.Error())
 	}
 	return foundUser, err
+}
+
+func (a *Api) SaveEvents(in io.Reader, out io.Writer, userid string) error {
+	if userid == "" {
+		a.Logger.Println(ErrNoUserId.Error)
+		return ErrNoUserId.Error
+	}
+
+	var dbBuffer bytes.Buffer
+
+	events.StreamNew(in, out, &dbBuffer)
+
+	if err := a.eStore.AddEvents(userid, dbBuffer.Bytes()); err != nil {
+		a.Logger.Println(err.Error())
+		return ErrInternalServer.Error
+	}
+	return nil
+}
+
+func (a *Api) GetEvents(out io.Writer, userid string) error {
+	if userid == "" {
+		a.Logger.Println(ErrNoUserId.Error)
+		return ErrNoUserId.Error
+	}
+
+	eventsData, err := a.eStore.GetEvents(userid)
+	if err != nil {
+		a.Logger.Println(err.Error())
+		return ErrInternalServer.Error
+	}
+
+	out.Write(eventsData)
+	return nil
 }
 
 func (a *Api) SaveSmbgs(in io.Reader, out io.Writer, userid string) error {
