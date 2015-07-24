@@ -52,7 +52,6 @@ $(function() {
     });
 
     loginPost.always(function( data ) {
-      alert( "Login Data: " + data );
       if (loginPost.getResponseHeader('x-fantail-token') !== null) {
         localStorage.setItem('x-fantail-token',loginPost.getResponseHeader('x-fantail-token'));
         $('#auth').removeClass('visible').addClass('hidden');
@@ -65,11 +64,11 @@ $(function() {
 
   $("#note").submit(function(e) {
       e.preventDefault();
+      $('#note').removeClass('visible').addClass('hidden');
       if (!conn) {
           return false;
       }
       if (!note.val()) {
-          console.l
           return false;
       }
       if (localStorage.getItem('x-fantail-token') === null) {
@@ -137,6 +136,8 @@ $(function() {
 //setup
   if (window["WebSocket"]) {
 
+    $('#note').removeClass('visible').addClass('hidden');
+
     if (localStorage.getItem('x-fantail-token') !== null) {
       $('#auth').removeClass('visible').addClass('hidden');
       $('#app').removeClass('hidden').addClass('visible');
@@ -152,8 +153,7 @@ $(function() {
     conn.onmessage = function(evt) {
         appendLog($("<div/>").text(evt.data))
         if (evt.data.indexOf("?") > -1) {
-          noteForm = "<div><form id=\"note\"><input type=\"text\" id=\"noteText\"><input type=\"submit\" value=\"Yep\" /><input type=\"submit\" value=\"Nah\" /></form></div>";
-          appendLog($(noteForm))
+          $('#note').removeClass('hidden').addClass('visible');
         }
     }
   } else {
@@ -199,7 +199,13 @@ body{margin:40px auto;max-width:650px;line-height:1.6;font-size:18px;color:#444;
   </div>
   <div id="app">
     <p><a href="" id="logout">Logout</a></p>
-    <div id="log">
+    <div id="log"></div>
+    <div id="notes">
+      <form id="note">
+        <input type="text" id="noteText">
+        <input type="submit" value="Yep" />
+        <input type="submit" value="Nah" />
+      </form>
     </div>
     <div>
       <form id="data">

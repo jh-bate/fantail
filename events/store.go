@@ -3,6 +3,7 @@ package events
 import (
 	"log"
 	"os"
+	"time"
 
 	"github.com/boltdb/bolt"
 )
@@ -36,22 +37,25 @@ func (s *Store) open() *bolt.DB {
 	return db
 }
 
-//nested bucket / userid and upload?
+//bucket per user
+//backet per `upload` for that user
 func (s *Store) AddEvents(userid string, data []byte) error {
-
-	current, _ := s.GetEvents(userid)
-
-	if len(current) > 0 {
-		s.logger.Println("we aleady have data for [", userid, "] so updating")
-		data = append(data, current...)
-	}
 
 	db := s.open()
 	defer db.Close()
 
 	err := db.Update(func(tx *bolt.Tx) error {
-		eb := tx.Bucket([]byte(data_bucket))
-		return eb.Put([]byte(userid), data)
+		s.logger.Println("getting data bucket")
+		eb := tx.Bucket([]byte(data_bucket)) //data
+		s.logger.Println("getting user bucket for ", userid)
+		ub, err := eb.CreateBucketIfNotExists([]byte(userid)) //user bucket
+		if err != nil {
+			s.logger.Println("failed getting  ", userid)
+			return err
+		}
+		addedDate := time.Now().UTC().String()
+		s.logger.Println("add upload", addedDate, "for", userid)
+		return ub.Put([]byte(addedDate), data)
 	})
 
 	if err != nil {
@@ -64,18 +68,20 @@ func (s *Store) AddEvents(userid string, data []byte) error {
 func (s *Store) GetEvents(userid string) ([]byte, error) {
 	db := s.open()
 	defer db.Close()
-
-	var events []byte
+	events := make([]byte, 0)
 
 	err := db.View(func(tx *bolt.Tx) error {
-		eb := tx.Bucket([]byte(data_bucket))
-		data := eb.Get([]byte(userid))
-		if len(data) > 0 {
-			events = make([]byte, len(data))
-			s.logger.Println("found events")
-			copy(events, data)
+		eb := tx.Bucket([]byte(data_bucket)) //data
+		ub := eb.Bucket([]byte(userid))      //user buckect
+
+		ub.ForEach(func(uploadId, uploadData []byte) error {
+			if len(uploadData) > 0 {
+				s.logger.Println("found upload", string(uploadId), "for", userid)
+				events = append(events, uploadData...)
+				//copy(events, uploadData)
+			}
 			return nil
-		}
+		})
 		return nil
 	})
 	if err != nil {
