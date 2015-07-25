@@ -23,62 +23,65 @@ func NewStore(StorePath string) *Store {
 	return &Store{logger: log.New(os.Stdout, "fantail:", log.Lshortfile), path: StorePath}
 }
 
-func (s *Store) open() *bolt.DB {
+func (s *Store) open(userid string) *bolt.DB {
 
 	db, err := bolt.Open(s.path, 0600, nil)
 	if err != nil {
-		log.Fatal(err)
+		s.logger.Panic(err.Error())
 	}
-	db.Update(func(tx *bolt.Tx) error {
+
+	err = db.Update(func(tx *bolt.Tx) error {
 		//create buckets for all types we use
-		tx.CreateBucketIfNotExists([]byte(data_bucket))
+		eventsB, err := tx.CreateBucketIfNotExists([]byte(data_bucket))
+		if err != nil {
+			s.logger.Println("failed creating events bucket error:", err.Error())
+			return err
+		}
+		//create the nested user bucket
+		_, err = eventsB.Tx().CreateBucketIfNotExists([]byte(userid))
+		if err != nil {
+			s.logger.Println("failed creating user bucket ", userid, "error:", err.Error())
+			return err
+		}
 		return nil
 	})
+	if err != nil {
+		s.logger.Panic(err.Error())
+	}
 	return db
 }
 
 //bucket per user
-//backet per `upload` for that user
+//user bucket stores per `upload` for that user
 func (s *Store) AddEvents(userid string, data []byte) error {
 
-	db := s.open()
+	db := s.open(userid)
 	defer db.Close()
 
-	err := db.Update(func(tx *bolt.Tx) error {
-		s.logger.Println("getting data bucket")
-		eb := tx.Bucket([]byte(data_bucket)) //data
-		s.logger.Println("getting user bucket for ", userid)
-		ub, err := eb.CreateBucketIfNotExists([]byte(userid)) //user bucket
-		if err != nil {
-			s.logger.Println("failed getting  ", userid)
-			return err
-		}
+	return db.Update(func(tx *bolt.Tx) error {
+		eventsB := tx.Bucket([]byte(data_bucket)) //data
+		userB := eventsB.Tx().Bucket([]byte(userid))
 		addedDate := time.Now().UTC().String()
-		s.logger.Println("add upload", addedDate, "for", userid)
-		return ub.Put([]byte(addedDate), data)
+		s.logger.Println("adding upload", addedDate, "for", userid)
+		return userB.Put([]byte(addedDate), data) //add events per user upload
 	})
-
-	if err != nil {
-		s.logger.Println(err.Error())
-	}
-
-	return err
 }
 
 func (s *Store) GetEvents(userid string) ([]byte, error) {
-	db := s.open()
+	db := s.open(userid)
 	defer db.Close()
 	events := make([]byte, 0)
 
 	err := db.View(func(tx *bolt.Tx) error {
-		eb := tx.Bucket([]byte(data_bucket)) //data
-		ub := eb.Bucket([]byte(userid))      //user buckect
-
-		ub.ForEach(func(uploadId, uploadData []byte) error {
+		eventsB := tx.Bucket([]byte(data_bucket))    //data
+		userB := eventsB.Tx().Bucket([]byte(userid)) //nested per user
+		s.logger.Println("getting uploads for", userid)
+		userB.ForEach(func(uploadId, uploadData []byte) error {
 			if len(uploadData) > 0 {
 				s.logger.Println("found upload", string(uploadId), "for", userid)
-				events = append(events, uploadData...)
-				//copy(events, uploadData)
+				uploadD := make([]byte, len(uploadData))
+				copy(uploadD, uploadData)
+				events = append(events, uploadD...)
 			}
 			return nil
 		})
