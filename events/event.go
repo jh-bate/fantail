@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io"
 	"log"
+	"sort"
 	"time"
 
 	"github.com/satori/go.uuid"
@@ -36,15 +37,6 @@ func NewEvent() *Event {
 	return s
 }
 
-func (m *Event) setId() {
-	m.Id = uuid.NewV4().String()
-}
-
-func (m *Event) json() []byte {
-	asJson, _ := json.Marshal(m)
-	return asJson
-}
-
 func StreamNew(rawJson io.Reader, eventJson ...io.Writer) error {
 	events := decode(rawJson)
 	_, err := io.MultiWriter(eventJson...).Write(events.json())
@@ -55,6 +47,15 @@ func StreamExisting(eventsJson io.Reader, eventsJsonOut ...io.Writer) error {
 	events := decodeExisting(eventsJson)
 	_, err := io.MultiWriter(eventsJsonOut...).Write(events.json())
 	return err
+}
+
+func (m *Event) setId() {
+	m.Id = uuid.NewV4().String()
+}
+
+func (m *Event) json() []byte {
+	asJson, _ := json.Marshal(m)
+	return asJson
 }
 
 func decode(src io.Reader) Events {
@@ -96,4 +97,55 @@ func (e Events) encode(dest io.Writer) error {
 func (e Events) json() []byte {
 	asJson, _ := json.Marshal(&e)
 	return asJson
+}
+
+//Sorting and filters
+type ByTime Events
+
+func (a ByTime) Len() int           { return len(a) }
+func (a ByTime) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a ByTime) Less(i, j int) bool { return a[i].Time < a[j].Time }
+
+func (e Events) SortByTime() {
+	sort.Sort(ByTime(e))
+}
+
+func (e Event) isOnWeekday() bool {
+	theTime, _ := time.Parse(time.RFC3339, e.Time)
+	if theTime.Weekday() == time.Saturday || theTime.Weekday() == time.Sunday {
+		return false
+	}
+	return true
+}
+
+func (e Events) Weekdays() Events {
+	var wd Events
+	for i := range e {
+		if e[i].isOnWeekday() {
+			wd = append(wd, e[i])
+		}
+	}
+	return wd
+}
+
+func (e Events) Weekends() Events {
+	var wd Events
+	for i := range e {
+		if e[i].isOnWeekday() == false {
+			wd = append(wd, e[i])
+		}
+	}
+	return wd
+}
+
+func (e Events) Type(t Type) Events {
+
+	var eot Events
+	for i := range e {
+
+		if GetType(e[i].Type) == t {
+			eot = append(eot, e[i])
+		}
+	}
+	return eot
 }

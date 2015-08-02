@@ -9,9 +9,19 @@ var (
 
 	ErrorSmbgValueValidation = errors.New("smbg value not set")
 
+	ErrorCbgValueValidation = errors.New("cbg value not set")
+
 	ErrorNoteTextValidation   = errors.New("note text is empty")
 	ErrorNoteAuthorValidation = errors.New("note authorId is not set")
+
+	ErrorFoodNoteValidation = errors.New("food noteId not set")
+
+	ErrorWellingValidation = errors.New("mood not set")
 )
+
+// Types
+//
+// The various types of event data that we deal with
 
 type Type string
 
@@ -61,14 +71,11 @@ func (t Type) String() string {
 	return "unknown"
 }
 
+//Smbg
+
 type Smbg struct {
 	Value float64 `json:"value"`
 	Units string  `json:"units"`
-}
-
-type Note struct {
-	Text     string `json:"value"`
-	AuthorId string `json:"authorId"`
 }
 
 func (e Smbg) Validate() (errs []error) {
@@ -76,6 +83,27 @@ func (e Smbg) Validate() (errs []error) {
 		errs = append(errs, ErrorSmbgValueValidation)
 	}
 	return errs
+}
+
+//Cbg
+
+type Cbg struct {
+	Value float64 `json:"value"`
+	Units string  `json:"units"`
+}
+
+func (e Cbg) Validate() (errs []error) {
+	if e.Value <= 0 {
+		errs = append(errs, ErrorSmbgValueValidation)
+	}
+	return errs
+}
+
+//Note
+
+type Note struct {
+	Text     string `json:"value"`
+	AuthorId string `json:"authorId"`
 }
 
 func (e Note) Validate() (errs []error) {
@@ -87,6 +115,44 @@ func (e Note) Validate() (errs []error) {
 	}
 	return errs
 }
+
+// Food
+
+type Food struct {
+	Carbs  int    `json:"carbohydrates"`
+	Units  string `json:"units"`
+	NoteId string `json:"note"`
+}
+
+func (e Food) Validate() (errs []error) {
+	if e.NoteId == "" {
+		errs = append(errs, ErrorFoodNoteValidation)
+	}
+	return errs
+}
+
+// Wellbeing
+
+type Wellbeing struct {
+	Mood `json:"mood"`
+}
+
+type Mood string
+
+var Moods = struct {
+	Happy    Type
+	UnHappy  Type
+	SameSame Type
+}{"happy", "un-happy", "same-same"}
+
+func (e Wellbeing) Validate() (errs []error) {
+	if e.Mood == "" {
+		errs = append(errs, ErrorWellingValidation)
+	}
+	return errs
+}
+
+//Generic event validation
 
 func (e *Event) Validate() (errs []error) {
 	if e.Id == "" {

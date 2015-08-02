@@ -13,7 +13,7 @@ type Store struct {
 	path   string
 }
 
-const data_bucket = "data"
+const events_bucket = "data"
 
 //EventStore created on a per user basis
 func NewStore(StorePath string) *Store {
@@ -32,7 +32,7 @@ func (s *Store) open(userid string) *bolt.DB {
 
 	err = db.Update(func(tx *bolt.Tx) error {
 		//create buckets for all types we use
-		eventsB, err := tx.CreateBucketIfNotExists([]byte(data_bucket))
+		eventsB, err := tx.CreateBucketIfNotExists([]byte(events_bucket))
 		if err != nil {
 			s.logger.Println("failed creating events bucket error:", err.Error())
 			return err
@@ -59,7 +59,7 @@ func (s *Store) AddEvents(userid string, data []byte) error {
 	defer db.Close()
 
 	return db.Update(func(tx *bolt.Tx) error {
-		eventsB := tx.Bucket([]byte(data_bucket)) //data
+		eventsB := tx.Bucket([]byte(events_bucket)) //data
 		userB := eventsB.Tx().Bucket([]byte(userid))
 		addedDate := time.Now().UTC().String()
 		s.logger.Println("adding upload", addedDate, "for", userid)
@@ -73,7 +73,7 @@ func (s *Store) GetEvents(userid string) ([]byte, error) {
 	events := make([]byte, 0)
 
 	err := db.View(func(tx *bolt.Tx) error {
-		eventsB := tx.Bucket([]byte(data_bucket))    //data
+		eventsB := tx.Bucket([]byte(events_bucket))  //events
 		userB := eventsB.Tx().Bucket([]byte(userid)) //nested per user
 		s.logger.Println("getting uploads for", userid)
 		userB.ForEach(func(uploadId, uploadData []byte) error {
