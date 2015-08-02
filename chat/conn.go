@@ -39,6 +39,7 @@ type connection struct {
 	// The websocket connection.
 	ws *websocket.Conn
 
+	// Our API
 	api *fantail.Api
 
 	// Buffered channel of outbound messages.
@@ -69,38 +70,63 @@ func (c *connection) write(mt int, payload []byte) error {
 	return c.ws.WriteMessage(mt, payload)
 }
 
-func (c *connection) saveData(rawData []byte) (display string, feedback []string) {
+func (c *connection) saveEvent(rawData []byte) map[string]interface{} {
 	var data map[string]interface{}
 	json.Unmarshal(rawData, &data)
 
 	dataUsr, err := c.api.AuthenticateUserSession(data["user"].(string))
 
+	if err != nil {
+		c.api.Logger.Fatal(err.Error())
+		return nil
+	}
+
 	if dataUsr != nil {
 		delete(data, "user")
 		data["creatorId"] = dataUsr.Id
 		if jsonData, err := json.Marshal(data); err == nil {
-
 			eventStr := string(jsonData[:])
-
 			c.api.SaveEvents(strings.NewReader(eventStr), os.Stdout, dataUsr.Id)
-			if strings.Contains(strings.ToLower(data["type"].(string)), "note") {
-				note := data["data"].(map[string]interface{})
-				return note["text"].(string), nil
-			} else if strings.Contains(strings.ToLower(data["type"].(string)), "smbg") {
-				smbg := data["data"].(map[string]interface{})["value"].(float64)
-
-				if smbg > 10 {
-					return fmt.Sprintf("%.1f", smbg), []string{"good work on taking a BG", "was that expected or un-expected?", "any notes you would like to add?"}
-				} else if smbg < 4 {
-					return fmt.Sprintf("%.1f", smbg), []string{"good work on taking a BG", "time to eat?", "remember to retest after 15 mins of treating a low", "and maybe add a note later so we can workout what might have gone wrong"}
-				}
-
-				return fmt.Sprintf("%.1f", smbg), []string{"awesome work - anything that is note worthy?"}
-			}
-			return "hmmmm something went wrong there!", nil
+			return data["data"].(map[string]interface{})
 		}
 	}
-	return err.Error(), nil
+	return nil
+}
+
+const (
+	start_greeting     = "Hey there great to see you!"
+	start_getting_data = "please wait while we look somethings up for you"
+
+	bg_comment          = ""
+	bg_normally_comment = ""
+
+	low_process = ""
+	low_why     = ""
+
+	inrange_congrats = "fantastic work, take a bow!!"
+	inrange_why      = "is there anything that is note worthy?"
+	inrange_tips     = ""
+
+	high_why  = ""
+	high_tips = ""
+)
+
+func (c *connection) getFeedBack(data map[string]interface{}) []string {
+
+	if strings.Contains(strings.ToLower(data["type"].(string)), "note") {
+		note := data["data"].(map[string]interface{})
+		return []string{note["text"].(string)}
+	} else if strings.Contains(strings.ToLower(data["type"].(string)), "smbg") {
+		smbg := data["data"].(map[string]interface{})["value"].(float64)
+		if smbg > 10 {
+			return []string{fmt.Sprintf("%.1f", smbg), "good work on taking a BG", "was that expected or un-expected?", "any notes you would like to add?"}
+		} else if smbg < 4 {
+			return []string{fmt.Sprintf("%.1f", smbg), "good work on taking a BG", "time to eat?", "remember to retest after 15 mins of treating a low", "and maybe add a note later so we can workout what might have gone wrong"}
+		}
+		return []string{fmt.Sprintf("%.1f", smbg), "awesome work - anything that is note worthy?"}
+	}
+	return nil
+
 }
 
 // writePump pumps messages from the hub to the websocket connection.
@@ -118,11 +144,9 @@ func (c *connection) writePump() {
 				return
 			}
 			//save to api
-			chatMessage, feedback := c.saveData(message)
+			data := c.saveEvent(message)
+			feedback := c.getFeedBack(data)
 			//lets chat!
-			if err := c.write(websocket.TextMessage, []byte(chatMessage)); err != nil {
-				return
-			}
 			for i := range feedback {
 				time.Sleep(time.Second * 1) //brief pause
 				if err := c.write(websocket.TextMessage, []byte(feedback[i])); err != nil {

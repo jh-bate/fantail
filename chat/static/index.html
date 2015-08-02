@@ -19,6 +19,10 @@ $(function() {
           d.scrollTop = d.scrollHeight - d.clientHeight;
       }
   }
+  /*
+   * Authorisation
+   */
+  // Logout
   $( "#logout" ).click(function( event ) {
     event.preventDefault();
     localStorage.setItem('x-fantail-token',null);
@@ -26,7 +30,7 @@ $(function() {
     $('#app').removeClass('visible').addClass('hidden');
     return false;
   });
-  //login
+  // Login
   $( "#login" ).submit(function( event ) {
     event.preventDefault();
 
@@ -61,7 +65,36 @@ $(function() {
 
     return false;
   });
+  /*
+   * Narrative
+   */
+  $("#mood").submit(function(e) {
+      e.preventDefault();
 
+      console.log('mood data',e)
+      if (!conn) {
+          return false;
+      }
+      /*if (!mood.val()) {
+          return false;
+      }*/
+      if (localStorage.getItem('x-fantail-token') === null) {
+        return false;
+      }
+
+      /*console.log('saving mood ...');
+      conn.send(JSON.stringify({
+        type: 'wellbeing',
+        user: localStorage.getItem('x-fantail-token'),
+        data:{
+          mood: mood.val()
+        },
+        time: new Date().toISOString()
+      }));
+      mood.val('');*/
+
+      return false
+  });
   $("#note").submit(function(e) {
       e.preventDefault();
       $('#note').removeClass('visible').addClass('hidden');
@@ -91,6 +124,7 @@ $(function() {
       return false
   });
   $("#data").submit(function(e) {
+      $('#data').removeClass('visible').addClass('hidden');
       e.preventDefault();
       if (!conn) {
           return false;
@@ -136,7 +170,15 @@ $(function() {
 //setup
   if (window["WebSocket"]) {
 
+
+    //start with `day`
+    appendLog($("<p><i>Welcome back!</i></p>"))
+    appendLog($("<p><i>How are things going?</i></p>"))
+    $('#day').removeClass('hidden').addClass('visible');
+
+    $('#mood').removeClass('visible').addClass('hidden');
     $('#note').removeClass('visible').addClass('hidden');
+    $('#data').removeClass('visible').addClass('hidden');
 
     if (localStorage.getItem('x-fantail-token') !== null) {
       $('#auth').removeClass('visible').addClass('hidden');
@@ -167,23 +209,10 @@ input[type=submit]{background:#444;color:#fff;}
 input{height:37px;margin:5px;font-size:18px;}
 body{margin:40px auto;max-width:650px;line-height:1.6;font-size:18px;color:#444;padding:0 10px}h1,h2,h3{line-height:1.2}
 
-.hidden{
-  display: none;
-}
-
-.visible{
-  display:block;
-}
-
-#data {
-  position: absolute;
-  bottom: 1em;
-}
-
-#logout {
-  position: absolute;
-  top: 1em;
-}
+.hidden{display: none;}
+.visible{display:block;}
+#data {position: absolute;bottom: 1em;}
+#logout {position: absolute;top: 1em;}
 
 </style>
 </head>
@@ -203,14 +232,25 @@ body{margin:40px auto;max-width:650px;line-height:1.6;font-size:18px;color:#444;
     <div id="notes">
       <form id="note">
         <input type="text" id="noteText">
-        <input type="submit" value="Yep" />
-        <input type="submit" value="Nah" />
+        <input type="submit" value="Save It" />
+        <input type="submit" value="Skip It" />
       </form>
     </div>
+    <form id="mood">
+        <input type="submit" id="happy" value="Happy" />
+        <input type="submit" id="same" value="OK" />
+        <input type="submit" id="unhappy" value="UnHappy" />
+    </form>
+    <form id="day">
+        <input type="submit" id="good" value="Good" />
+        <input type="submit" id="ok" value="OK" />
+        <input type="submit" id="bad" value="Bad" />
+    </form>
     <div>
       <form id="data">
         <input type="text" id="smbgText" placeholder="bg e.g. 10.7">
-        <input type="submit" value="Save" />
+        <input type="submit" value="Save It" />
+        <input type="submit" value="Skip It" />
       </form>
     </div>
   </div>
